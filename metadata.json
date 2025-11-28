@@ -1,0 +1,7 @@
+{
+  "name": "SonicPulse Visualizer",
+  "description": "A highly customizable audio visualization tool allowing users to capture system audio or microphone input and visualize it with detailed parameter controls.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
