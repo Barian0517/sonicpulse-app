@@ -1,0 +1,56 @@
+name: 'Publish'
+
+on:
+  push:
+    tags:
+      - 'v*' # 當你推送以 v 開頭的標籤時觸發，例如 v0.1.0
+
+jobs:
+  publish:
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: 'macos-latest' # 如果你也想要 Mac 版本可以保留
+            args: '--target universal-apple-darwin'
+          - platform: 'ubuntu-22.04' # Linux 版本
+            args: ''
+          - platform: 'windows-latest' # Windows 版本 (.exe)
+            args: ''
+
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: setup node
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+
+      - name: install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          # 只有在 Windows 上需要這個 target
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - name: install dependencies (ubuntu only)
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev
+
+      - name: install frontend dependencies
+        run: npm install
+
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: v__VERSION__ # 這會自動抓取 package.json 的版本號
+          releaseName: 'SonicPulse Visualizer v__VERSION__'
+          releaseBody: 'See the assets below to download the application.'
+          releaseDraft: true
+          prerelease: false
+          args: ${{ matrix.args }}

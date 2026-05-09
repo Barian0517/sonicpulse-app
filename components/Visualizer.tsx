@@ -5,6 +5,7 @@ import { VisualizerConfig, VisualizerShape, VisualizerDirection, VisualizerStyle
 interface VisualizerProps {
   analyser: AnalyserNode | null;
   config: VisualizerConfig;
+  isOverlay?: boolean;
 }
 
 // Helper to parse hex color to RGB
@@ -17,11 +18,31 @@ const hexToRgb = (hex: string) => {
   } : { r: 255, g: 255, b: 255 };
 };
 
-const Visualizer = forwardRef<HTMLCanvasElement, VisualizerProps>(({ analyser, config }, ref) => {
+const Visualizer = forwardRef<HTMLCanvasElement, VisualizerProps>(({ analyser, config, isOverlay = false }, ref) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const requestRef = useRef<number | null>(null);
   const dataArrayRef = useRef<Uint8Array | null>(null);
   const bgImageRef = useRef<HTMLImageElement>(new Image());
+  const channelRef = useRef<BroadcastChannel | null>(null);
+  
+  // Overlay state
+  const overlayDataRef = useRef<{data: number[], bassAvg: number} | null>(null);
+  const overlayConfigRef = useRef<VisualizerConfig>(config);
+
+  useEffect(() => {
+    channelRef.current = new BroadcastChannel('sonicpulse_sync');
+    if (isOverlay) {
+       channelRef.current.onmessage = (e) => {
+           if (e.data.type === 'sync') {
+               overlayDataRef.current = { data: e.data.data, bassAvg: e.data.bassAvg };
+               overlayConfigRef.current = e.data.config;
+           }
+       };
+    }
+    return () => {
+       channelRef.current?.close();
+    };
+  }, [isOverlay]);
   
   // Expose canvas ref and custom draw method to parent
   useImperativeHandle(ref, () => Object.assign(canvasRef.current!, {
@@ -59,6 +80,11 @@ const Visualizer = forwardRef<HTMLCanvasElement, VisualizerProps>(({ analyser, c
   useEffect(() => {
       if (config.backgroundImage) {
           bgImageRef.current.src = config.backgroundImage;
+          // Add error handling for broken data URLs
+          bgImageRef.current.onerror = () => {
+              console.warn("Background image failed to load, clearing source.");
+              bgImageRef.current.src = "";
+          };
       }
   }, [config.backgroundImage]);
 
@@ -127,8 +153,25 @@ const Visualizer = forwardRef<HTMLCanvasElement, VisualizerProps>(({ analyser, c
     // Clear
     ctx.clearRect(0, 0, width, height);
 
+    if (isOverlay) {
+        // Overlay Mode rendering
+        const currentConfig = overlayConfigRef.current || config;
+        const currentData = overlayDataRef.current;
+        
+        if (currentConfig.backgroundImage && bgImageRef.current.complete && bgImageRef.current.src) {
+            drawBackground(ctx, width, height, currentData?.bassAvg || 0);
+        }
+        
+        if (currentData && currentData.data) {
+            drawVisualizerContent(ctx, width, height, currentData.data, currentData.bassAvg);
+        }
+        
+        requestRef.current = requestAnimationFrame(draw);
+        return;
+    }
+
     if (!analyser) {
-        if (config.backgroundImage && bgImageRef.current.complete) {
+        if (config.backgroundImage && bgImageRef.current.complete && bgImageRef.current.src) {
             drawBackground(ctx, width, height, 0);
         }
         return;
@@ -166,6 +209,16 @@ const Visualizer = forwardRef<HTMLCanvasElement, VisualizerProps>(({ analyser, c
     drawBackground(ctx, width, height, bassAvg);
 
     drawVisualizerContent(ctx, width, height, data, bassAvg);
+
+    // Broadcast to overlay
+    if (!isOverlay && channelRef.current) {
+        channelRef.current.postMessage({
+            type: 'sync',
+            data: data,
+            bassAvg: bassAvg,
+            config: config
+        });
+    }
 
     requestRef.current = requestAnimationFrame(draw);
   };
@@ -457,7 +510,7 @@ const Visualizer = forwardRef<HTMLCanvasElement, VisualizerProps>(({ analyser, c
   };
 
   const drawBackground = (ctx: CanvasRenderingContext2D, width: number, height: number, bassAvg: number) => {
-     if (!config.backgroundImage || !bgImageRef.current.complete) return;
+     if (!config.backgroundImage || !bgImageRef.current.complete || !bgImageRef.current.src) return;
 
      ctx.save();
      
@@ -504,6 +557,13 @@ const Visualizer = forwardRef<HTMLCanvasElement, VisualizerProps>(({ analyser, c
      ctx.scale(currentScale, currentScale);
 
      const img = bgImageRef.current;
+     
+     // Robustness check for zero-size image
+     if (img.width === 0 || img.height === 0) {
+         ctx.restore();
+         return;
+     }
+
      let drawW = width;
      let drawH = width * (img.height / img.width);
      if (drawH < height) {

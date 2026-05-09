@@ -27,6 +27,11 @@ interface ControlsProps {
   
   isGlobalMute: boolean;
   onToggleGlobalMute: () => void;
+  
+  onLaunchOverlay: () => void;
+  onToggleOverlayLock: () => void;
+  isOverlayLocked: boolean;
+  hasOverlay: boolean;
 }
 
 const Controls: React.FC<ControlsProps> = ({ 
@@ -47,7 +52,11 @@ const Controls: React.FC<ControlsProps> = ({
   isUIHidden,
   onToggleUI,
   isGlobalMute,
-  onToggleGlobalMute
+  onToggleGlobalMute,
+  onLaunchOverlay,
+  onToggleOverlayLock,
+  isOverlayLocked,
+  hasOverlay
 }) => {
   const [isOpen, setIsOpen] = useState(true);
   const [activeTab, setActiveTab] = useState<'audio' | 'style' | 'layout' | 'image' | 'effects'>('audio');
@@ -104,8 +113,17 @@ const Controls: React.FC<ControlsProps> = ({
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-        const url = URL.createObjectURL(file);
-        handleChange('backgroundImage', url);
+        // Use FileReader to create a persistent Data URL instead of a Blob URL
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            const result = reader.result as string;
+            // Basic size check to warn user if image might fail local storage (approx 3MB limit usually)
+            if (result.length > 3000000) {
+                alert("Image is very large and might not save to settings permanently.");
+            }
+            handleChange('backgroundImage', result);
+        };
+        reader.readAsDataURL(file);
     }
   };
 
@@ -158,6 +176,28 @@ const Controls: React.FC<ControlsProps> = ({
                     <Circle size={8} fill="currentColor" className={isRecording ? "" : "text-red-500"} />
                     {isRecording ? "REC" : "REC"}
                  </button>
+
+                 {/* Overlay Toggle */}
+                 {(window as any).__TAURI_INTERNALS__ && (
+                    <div className="flex bg-white/5 rounded-full p-0.5">
+                        <button 
+                            onClick={onLaunchOverlay}
+                            className={`p-1.5 rounded-full text-xs transition-all ${hasOverlay ? 'text-blue-400 bg-blue-500/10' : 'text-gray-400 hover:text-white hover:bg-white/10'}`}
+                            title="Launch Overlay Window"
+                        >
+                            <Sparkles size={16} />
+                        </button>
+                        {hasOverlay && (
+                            <button 
+                                onClick={onToggleOverlayLock}
+                                className={`p-1.5 rounded-full text-xs font-bold transition-all px-3 ${isOverlayLocked ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 'bg-green-500/20 text-green-400 border border-green-500/30'}`}
+                                title={isOverlayLocked ? "Unlock to move" : "Lock to click-through"}
+                            >
+                                {isOverlayLocked ? "LOCKED" : "EDIT"}
+                            </button>
+                        )}
+                    </div>
+                 )}
 
                  {/* Hide UI */}
                  <button 
@@ -278,7 +318,7 @@ const Controls: React.FC<ControlsProps> = ({
                                 <div className={`text-sm font-bold ${audioState.mode === 'file' ? 'text-white' : 'text-gray-300'}`}>{t.audio.file}</div>
                                 <div className="text-xs text-gray-500 truncate">{audioState.fileName || t.audio.fileDesc}</div>
                             </div>
-                            <input type="file" accept="audio/*" className="hidden" onChange={onFileSelect} />
+                            <input type="file" accept="audio/*" multiple className="hidden" onChange={onFileSelect} />
                         </label>
                         
                         {/* Direct Render Button for Files */}

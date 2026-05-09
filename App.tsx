@@ -6,23 +6,9 @@ import Player from './components/Player';
 import ParticleOverlay from './components/ParticleOverlay';
 import { VisualizerConfig, VisualizerShape, VisualizerDirection, VisualizerStyle, SymmetryMode, AudioSourceState, VisualizerMaterial, VisualizerParticleEffect } from './types';
 import { translations, Language } from './translations';
-import { Maximize2, Minimize2, Eye, Circle } from 'lucide-react';
+import { Maximize2, Minimize2, Eye, Circle, X, Move } from 'lucide-react';
 
-// Fix for missing WebCodecs types
-declare global {
-  class AudioEncoder {
-    constructor(init: { output: (chunk: any, meta: any) => void, error: (e: any) => void });
-    configure(config: any): void;
-    encode(data: any): void;
-    flush(): Promise<void>;
-    close(): void;
-  }
-  
-  class AudioData {
-    constructor(init: any);
-    close(): void;
-  }
-}
+
 
 // Default Configuration
 const DEFAULT_CONFIG: VisualizerConfig = {
@@ -63,6 +49,9 @@ const DEFAULT_CONFIG: VisualizerConfig = {
 
 const STORAGE_KEY_CONFIG = 'sonicpulse_config';
 const STORAGE_KEY_LANG = 'sonicpulse_lang';
+const STORAGE_KEY_MUTE = 'sonicpulse_mute';
+const STORAGE_KEY_VOLUME = 'sonicpulse_volume';
+const STORAGE_KEY_MONITOR = 'sonicpulse_monitor';
 
 const App: React.FC = () => {
   // Load config from local storage or use default
@@ -76,6 +65,12 @@ const App: React.FC = () => {
         if (parsed.barCount > 1000 && parsed.shape === VisualizerShape.Sphere) {
              parsed.barCount = 1000;
         }
+        
+        // Remove 'blob:' URLs as they are not persistent across reloads
+        if (parsed.backgroundImage && parsed.backgroundImage.startsWith('blob:')) {
+            parsed.backgroundImage = null;
+        }
+
         return { ...DEFAULT_CONFIG, ...parsed };
       }
     } catch (e) {
@@ -87,18 +82,38 @@ const App: React.FC = () => {
   const [audioState, setAudioState] = useState<AudioSourceState>({ 
     isPlaying: false, 
     mode: 'file',
-    monitorAudio: false,
-    volume: 0.7
+    monitorAudio: (() => {
+        try {
+            return localStorage.getItem(STORAGE_KEY_MONITOR) === 'true';
+        } catch (e) { return false; }
+    })(),
+    volume: (() => {
+        try {
+            const saved = localStorage.getItem(STORAGE_KEY_VOLUME);
+            return saved !== null ? parseFloat(saved) : 0.7;
+        } catch (e) { return 0.7; }
+    })()
   });
 
   // Player State
+  const [playlist, setPlaylist] = useState<{name: string, url: string, file: File | null}[]>([]);
+  const [currentTrackIndex, setCurrentTrackIndex] = useState(-1);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
   
   // UI State
   const [isUIHidden, setIsUIHidden] = useState(false);
-  const [isGlobalMute, setIsGlobalMute] = useState(false);
+  const [isGlobalMute, setIsGlobalMute] = useState(() => {
+      try {
+          return localStorage.getItem(STORAGE_KEY_MUTE) === 'true';
+      } catch (e) { return false; }
+  });
+
+  // Overlay State
+  const [hasOverlay, setHasOverlay] = useState(false);
+  const [isOverlayLocked, setIsOverlayLocked] = useState(false);
+  const overlayWindowRef = useRef<any>(null);
 
   // Recording State
   const [isRecording, setIsRecording] = useState(false);
@@ -125,13 +140,37 @@ const App: React.FC = () => {
   
   // Persist config changes
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY_CONFIG, JSON.stringify(config));
+    try {
+        localStorage.setItem(STORAGE_KEY_CONFIG, JSON.stringify(config));
+    } catch (e) {
+        console.warn("Failed to save config to local storage (quota exceeded?)", e);
+        // Fallback: Try saving without the heavy background image
+        if (config.backgroundImage) {
+            const configNoBg = { ...config, backgroundImage: null };
+            try {
+                localStorage.setItem(STORAGE_KEY_CONFIG, JSON.stringify(configNoBg));
+            } catch (retryErr) {
+                console.error("Critical failure saving config", retryErr);
+            }
+        }
+    }
   }, [config]);
 
   // Persist language changes
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY_LANG, language);
   }, [language]);
+
+  // Persist Mute status
+  useEffect(() => {
+      localStorage.setItem(STORAGE_KEY_MUTE, isGlobalMute.toString());
+  }, [isGlobalMute]);
+
+  // Persist Volume and Monitor settings
+  useEffect(() => {
+      localStorage.setItem(STORAGE_KEY_VOLUME, audioState.volume.toString());
+      localStorage.setItem(STORAGE_KEY_MONITOR, audioState.monitorAudio.toString());
+  }, [audioState.volume, audioState.monitorAudio]);
 
   // Handle Fullscreen
   const toggleFullscreen = () => {
@@ -149,6 +188,65 @@ const App: React.FC = () => {
       document.addEventListener('fullscreenchange', handleFsChange);
       return () => document.removeEventListener('fullscreenchange', handleFsChange);
   }, []);
+
+  // Overlay Management
+  const launchOverlay = async () => {
+      try {
+          // @ts-ignore
+          const { WebviewWindow } = await import('@tauri-apps/api/webviewWindow');
+          
+          if (overlayWindowRef.current) {
+              await overlayWindowRef.current.close();
+              overlayWindowRef.current = null;
+              setHasOverlay(false);
+              return;
+          }
+
+          const webview = new WebviewWindow('overlay', {
+              url: '/?overlay=true',
+              title: 'SonicPulse Overlay',
+              transparent: true,
+              decorations: false,
+              alwaysOnTop: true,
+              resizable: true,
+              shadow: false, // Disable OS-level shadow
+              width: 800,
+              height: 600,
+          });
+
+          webview.once('tauri://created', function () {
+              overlayWindowRef.current = webview;
+              setHasOverlay(true);
+              setIsOverlayLocked(false);
+          });
+
+          webview.once('tauri://error', function (e) {
+              console.error('Error creating overlay:', e);
+              alert('Error creating overlay: ' + JSON.stringify(e));
+          });
+          
+          webview.onCloseRequested(() => {
+              overlayWindowRef.current = null;
+              setHasOverlay(false);
+          });
+
+      } catch (e: any) {
+          console.error("Failed to launch overlay", e);
+          alert("Failed to launch overlay: " + e.message);
+      }
+  };
+
+  const toggleOverlayLock = async () => {
+      if (!overlayWindowRef.current) return;
+      try {
+          const newLockedState = !isOverlayLocked;
+          await overlayWindowRef.current.setIgnoreCursorEvents(newLockedState);
+          setIsOverlayLocked(newLockedState);
+          new BroadcastChannel('sonicpulse_overlay_state').postMessage({ locked: newLockedState });
+      } catch (e) {
+          console.error("Failed to set ignore cursor events:", e);
+      }
+  };
 
   // Recording Timer
   useEffect(() => {
@@ -346,34 +444,64 @@ const App: React.FC = () => {
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = Array.from(e.target.files || []) as File[];
+    if (files.length === 0) return;
 
+    const newTracks = files.map(file => ({
+      name: file.name,
+      url: URL.createObjectURL(file),
+      file: file
+    }));
+
+    setPlaylist(newTracks);
+    setCurrentTrackIndex(0);
+    playTrack(newTracks[0]);
+  };
+
+  const playTrack = (track: {name: string, url: string}) => {
     cleanupAudio();
     initAudioContext();
 
-    if (audioElementRef.current && audioContextRef.current && analyserRef.current && gainNodeRef.current && masterGainRef.current && destRef.current) {
-      const url = URL.createObjectURL(file);
-      audioElementRef.current.src = url;
-      audioElementRef.current.load();
-      audioElementRef.current.play()
-        .then(() => setAudioState(prev => ({ ...prev, isPlaying: true })))
-        .catch(e => console.error("Play error:", e));
+    if (!audioContextRef.current || !analyserRef.current || !gainNodeRef.current || !destRef.current || !audioElementRef.current) return;
 
-      const source = audioContextRef.current.createMediaElementSource(audioElementRef.current);
-      
-      // File Audio Connections:
-      // 1. Source -> Analyser -> Gain -> MasterGain -> Speakers
-      source.connect(analyserRef.current);
-      analyserRef.current.connect(gainNodeRef.current);
-      gainNodeRef.current.connect(masterGainRef.current); // Always on for files
-      
-      // 2. Source -> Record Destination (Clean audio for recording)
-      source.connect(destRef.current);
+    audioElementRef.current.src = track.url;
+    audioElementRef.current.load();
+    audioElementRef.current.play().catch(console.error);
 
-      sourceRef.current = source;
-      setAudioState(prev => ({ ...prev, mode: 'file', fileName: file.name, monitorAudio: true }));
-    }
+    const source = audioContextRef.current.createMediaElementSource(audioElementRef.current);
+    source.connect(analyserRef.current);
+    analyserRef.current.connect(gainNodeRef.current);
+    gainNodeRef.current.connect(masterGainRef.current);
+    source.connect(destRef.current);
+
+    sourceRef.current = source;
+    setAudioState(prev => ({ 
+      ...prev, 
+      isPlaying: true, 
+      mode: 'file', 
+      fileName: track.name,
+      monitorAudio: true 
+    }));
+  };
+
+  const handleNextTrack = () => {
+    if (playlist.length === 0) return;
+    const nextIndex = (currentTrackIndex + 1) % playlist.length;
+    setCurrentTrackIndex(nextIndex);
+    playTrack(playlist[nextIndex]);
+  };
+
+  const handlePrevTrack = () => {
+    if (playlist.length === 0) return;
+    const prevIndex = (currentTrackIndex - 1 + playlist.length) % playlist.length;
+    setCurrentTrackIndex(prevIndex);
+    playTrack(playlist[prevIndex]);
+  };
+
+  const handleSelectTrack = (index: number) => {
+    if (index < 0 || index >= playlist.length) return;
+    setCurrentTrackIndex(index);
+    playTrack(playlist[index]);
   };
 
   const handleOutputDeviceChange = async (deviceId: string) => {
@@ -511,6 +639,17 @@ const App: React.FC = () => {
 
   // Bind Audio Element Events
   useEffect(() => {
+    const handleClear = () => {
+        cleanupAudio();
+        setAudioState(prev => ({ ...prev, isPlaying: false, fileName: '' }));
+        setPlaylist([]);
+        setCurrentTrackIndex(-1);
+    };
+    window.addEventListener('sonicpulse_clear_audio', handleClear);
+    return () => window.removeEventListener('sonicpulse_clear_audio', handleClear);
+  }, []);
+
+  useEffect(() => {
     const el = audioElementRef.current;
     if (!el) return;
 
@@ -518,7 +657,11 @@ const App: React.FC = () => {
     const onDurationChange = () => setDuration(el.duration);
     
     const onEnded = () => {
-        setAudioState(prev => ({ ...prev, isPlaying: false }));
+        if (playlist.length > 1) {
+            handleNextTrack();
+        } else {
+            setAudioState(prev => ({ ...prev, isPlaying: false }));
+        }
         // Auto stop recording if in auto-render mode
         if (isAutoRender && mediaRecorderRef.current?.state === 'recording') {
             handleStopRecording();
@@ -542,6 +685,76 @@ const App: React.FC = () => {
       el.removeEventListener('pause', onPause);
     };
   }, [isAutoRender]); // Re-bind if isAutoRender changes (captured in closure)
+  
+  // Overlay Window internal state
+  const [isThisOverlayLocked, setIsThisOverlayLocked] = useState(false);
+  useEffect(() => {
+      const bc = new BroadcastChannel('sonicpulse_overlay_state');
+      bc.onmessage = async (e) => {
+          if (window.location.search.includes('overlay=true')) {
+              // Overlay mode handling
+              if (e.data.locked !== undefined) {
+                  setIsThisOverlayLocked(e.data.locked);
+              }
+          } else {
+              // Main mode handling
+              if (e.data.action === 'close' && overlayWindowRef.current) {
+                  try {
+                      await overlayWindowRef.current.close();
+                  } catch(err) {
+                      console.error("Failed to close overlay via broadcast", err);
+                  }
+                  overlayWindowRef.current = null;
+                  setHasOverlay(false);
+              }
+          }
+      };
+      return () => bc.close();
+  }, [hasOverlay]);
+
+  // Check if we are in overlay mode
+  const isOverlayMode = window.location.search.includes('overlay=true');
+
+  if (isOverlayMode) {
+      return (
+          <div 
+             className={`w-screen h-screen overflow-hidden font-sans relative transition-all duration-300 ${isThisOverlayLocked ? 'bg-transparent border-none shadow-none' : 'bg-black/40 border border-white/20 shadow-2xl'}`}
+          >
+             <Visualizer analyser={null} config={config} isOverlay={true} />
+             
+             {/* Edit Mode UI (Hidden when locked) */}
+             {!isThisOverlayLocked && (
+                 <>
+                     {/* Draggable Titlebar */}
+                     <div data-tauri-drag-region className="absolute top-0 left-0 w-full h-8 flex items-center justify-between px-3 z-50 cursor-move bg-black/60 border-b border-white/10 group">
+                         <div data-tauri-drag-region className="flex items-center gap-2 pointer-events-none text-white/50 group-hover:text-white transition-colors w-full h-full">
+                            <Move size={14} />
+                            <span className="text-xs font-bold tracking-widest uppercase">Drag to Move</span>
+                         </div>
+                         <button 
+                            className="text-white/50 hover:text-red-400 p-1 rounded transition-colors z-50"
+                            onClick={() => {
+                                // Request main window to close this overlay
+                                new BroadcastChannel('sonicpulse_overlay_state').postMessage({ action: 'close' });
+                            }}
+                         >
+                             <X size={16} />
+                         </button>
+                     </div>
+                     
+                     <div className="absolute inset-0 pointer-events-none flex items-center justify-center z-40">
+                         <div className="bg-black/60 text-white px-6 py-3 rounded-xl backdrop-blur-md shadow-2xl border border-white/10 flex flex-col items-center gap-2">
+                             <div className="font-bold text-lg">EDIT MODE</div>
+                             <div className="text-sm opacity-70 text-center">
+                               Drag top bar to move.<br/>Drag window edges to resize.<br/>Click "LOCKED" in Main App when done.
+                             </div>
+                         </div>
+                     </div>
+                 </>
+             )}
+          </div>
+      );
+  }
 
   return (
     <div className="relative w-screen h-screen bg-black overflow-hidden font-sans">
@@ -583,6 +796,10 @@ const App: React.FC = () => {
             onToggleUI={() => setIsUIHidden(!isUIHidden)}
             isGlobalMute={isGlobalMute}
             onToggleGlobalMute={() => setIsGlobalMute(!isGlobalMute)}
+            onLaunchOverlay={launchOverlay}
+            onToggleOverlayLock={toggleOverlayLock}
+            isOverlayLocked={isOverlayLocked}
+            hasOverlay={hasOverlay}
           />
       </div>
       
@@ -618,6 +835,11 @@ const App: React.FC = () => {
                 onTogglePlay={togglePlay}
                 onSeek={handleSeek}
                 onVolumeChange={handleVolumeChange}
+                playlist={playlist}
+                currentIndex={currentTrackIndex}
+                onNext={handleNextTrack}
+                onPrev={handlePrevTrack}
+                onSelectTrack={handleSelectTrack}
              />
           )}
       </div>
