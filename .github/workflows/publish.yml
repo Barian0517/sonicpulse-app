@@ -48,21 +48,19 @@ jobs:
         run: npm install
 
       - name: auto-increment version
+        shell: bash
         run: |
-          node <<EOF
-          const fs = require('fs');
-          const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
-          const tauri = JSON.parse(fs.readFileSync('src-tauri/tauri.conf.json', 'utf8'));
-          
-          const newVersion = \`\${pkg.version}.\${process.env.GITHUB_RUN_NUMBER}\`;
-          console.log(\`Updating version to: \${newVersion}\`);
-          
-          pkg.version = newVersion;
-          tauri.version = newVersion;
-          
-          fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2));
-          fs.writeFileSync('src-tauri/tauri.conf.json', JSON.stringify(tauri, null, 2));
-          EOF
+          node -e "
+            const fs = require('fs');
+            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+            const tauri = JSON.parse(fs.readFileSync('src-tauri/tauri.conf.json', 'utf8'));
+            const newVersion = pkg.version + '.' + process.env.GITHUB_RUN_NUMBER;
+            console.log('Updating version to: ' + newVersion);
+            pkg.version = newVersion;
+            tauri.version = newVersion;
+            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2));
+            fs.writeFileSync('src-tauri/tauri.conf.json', JSON.stringify(tauri, null, 2));
+          "
         env:
           GITHUB_RUN_NUMBER: ${{ github.run_number }}
 
