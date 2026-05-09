@@ -2,8 +2,13 @@ name: 'Publish'
 
 on:
   push:
+    branches:
+      - main
     tags:
-      - 'v*' # 當你推送以 v 開頭的標籤時觸發，例如 v0.1.0
+      - 'v*'
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   publish:
@@ -13,11 +18,11 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - platform: 'macos-latest' # 如果你也想要 Mac 版本可以保留
+          - platform: 'macos-latest'
             args: '--target universal-apple-darwin'
-          - platform: 'ubuntu-22.04' # Linux 版本
+          - platform: 'ubuntu-22.04'
             args: ''
-          - platform: 'windows-latest' # Windows 版本 (.exe)
+          - platform: 'windows-latest'
             args: ''
 
     runs-on: ${{ matrix.platform }}
@@ -32,7 +37,6 @@ jobs:
       - name: install Rust stable
         uses: dtolnay/rust-toolchain@stable
         with:
-          # 只有在 Windows 上需要這個 target
           targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
 
       - name: install dependencies (ubuntu only)
@@ -48,9 +52,10 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tagName: v__VERSION__ # 這會自動抓取 package.json 的版本號
+          tagName: v__VERSION__
           releaseName: 'SonicPulse Visualizer v__VERSION__'
           releaseBody: 'See the assets below to download the application.'
           releaseDraft: true
           prerelease: false
+          allowUpdates: true
           args: ${{ matrix.args }}
