@@ -54,7 +54,7 @@ jobs:
             const fs = require('fs');
             const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
             const tauri = JSON.parse(fs.readFileSync('src-tauri/tauri.conf.json', 'utf8'));
-            const newVersion = pkg.version + '.' + process.env.GITHUB_RUN_NUMBER;
+            const newVersion = pkg.version + '-build.' + process.env.GITHUB_RUN_NUMBER;
             console.log('Updating version to: ' + newVersion);
             pkg.version = newVersion;
             tauri.version = newVersion;
