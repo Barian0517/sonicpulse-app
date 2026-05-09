@@ -47,6 +47,21 @@ jobs:
       - name: install frontend dependencies
         run: npm install
 
+      - name: auto-increment version
+        shell: bash
+        run: |
+          # 取得目前的版本號
+          CURRENT_VERSION=$(node -p "require('./package.json').version")
+          # 結合 GitHub Run Number 產生唯一版本號 (例如 0.1.0.12)
+          # 注意：Tauri v2 的版本號格式建議符合 Semantic Versioning 或 x.y.z.w
+          NEW_VERSION="${CURRENT_VERSION}.${{ github.run_number }}"
+          echo "Building version: $NEW_VERSION"
+          
+          # 更新 tauri.conf.json 中的版本號
+          sed -i "s/\"version\": \".*\"/\"version\": \"$NEW_VERSION\"/" src-tauri/tauri.conf.json
+          # 更新 package.json (可選，但保持一致較好)
+          sed -i "s/\"version\": \".*\"/\"version\": \"$NEW_VERSION\"/" package.json
+
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
