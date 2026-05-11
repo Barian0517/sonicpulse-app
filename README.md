@@ -1,56 +1,51 @@
-# SonicPulse Visualizer
+# SonicPulse Visualizer 🎵
 
-一個基於 Tauri + React + Vite 開發的高效能音訊視覺化工具。
+![SonicPulse Visualizer](https://raw.githubusercontent.com/Barian0517/sonicpulse-app/main/src/assets/banner.png)
 
-## 🚀 開發環境配置
+SonicPulse 是一款為桌面端打造的高性能音訊視覺化工具，將您的音樂與系統聲音轉化為炫目的動態視覺藝術。
 
-### 重要修正：埠號設定
-- **Vite 埠號**: `3000` (設定於 `vite.config.ts`)
-- **Tauri DevUrl**: `http://localhost:3000` (設定於 `src-tauri/tauri.conf.json`)
-> **注意**: 如果修改了 Vite 的埠號，必須同步更新 `tauri.conf.json` 中的 `devUrl`，否則開發模式下視窗將無法啟動。
+## ✨ 特色功能
 
-### Rust 環境變數 (Windows)
-若在終端機無法執行 `cargo` 或 `rustc`，請執行以下 PowerShell 指令（管理員權限）：
-```powershell
-[System.Environment]::SetEnvironmentVariable("PATH", $env:PATH + ";$env:USERPROFILE\.cargo\bin", [System.EnvironmentVariableTarget]::User)
-```
+- **多樣化視覺效果**：支援 圓形 (Circle)、球面 (Sphere)、線條 (Line) 等多種幾何形狀。
+- **全方位音訊監聽**：
+  - **檔案播放**：支援 MP3, WAV, FLAC 等格式，具備多曲目播放清單。
+  - **麥克風輸入**：即時捕捉您的聲音或外部音源。
+  - **系統音訊**：擷取桌面聲音（需在分享視窗時勾選「分享音訊」）。
+- **高度自定義**：自由調整顏色、條柱數量、長度、粗細、震動感及背景圖片。
+- **懸浮窗模式 (Overlay)**：
+  - 獨立的置頂透明視窗。
+  - 自動記憶視窗位置、大小與鎖定狀態。
+  - 支援「滑鼠穿透」鎖定，完美融入桌面背景。
+- **粒子特效**：內建 雪花 (Snow)、下雨 (Rain)、星空 (Stars) 與 煙火 (Firework) 等背景粒子。
+- **即時錄影**：支援將視覺化畫面連同音訊錄製為高品質 WebM 影片。
 
-## 🛠️ 常用指令
+## 🚀 使用指南
 
-### 開發模式
-啟動 Vite 開發伺服器與 Tauri 視窗：
-```bash
-npx tauri dev
-```
+### 1. 開始使用
+- **導入音樂**：點擊「開啟檔案」圖示，選取一首或多首音樂檔案。
+- **切換模式**：在控制面板中切換「麥克風」或「系統音訊」監聽。
 
-### 本地打包 (.exe)
-編譯並打包 Windows 執行檔與安裝程式：
-```bash
-npx tauri build
-```
-- **執行檔位置**: `src-tauri/target/release/app.exe`
-- **安裝程式位置**: `src-tauri/target/release/bundle/nsis/sonicpulse-visualizer_x64-setup.exe`
+### 2. 自定義外型
+- **顏色**：支援單色、漸層或隨機顏色。
+- **形狀**：從下拉選單選擇不同的渲染形狀。
+- **背景**：可上傳自己的圖片，並調整背景震動感與透明度。
 
-## 📦 GitHub Actions 自動化發布
+### 3. 懸浮窗模式 (桌面裝飾)
+- 點擊「開啟懸浮窗」。
+- 在「編輯模式」下，您可以隨意拖曳、縮放懸浮窗。
+- 調整完成後點擊「鎖定」，懸浮窗將會隱藏邊框並支援滑鼠穿透，成為桌面背景的一部分。
 
-本專案已配置 GitHub Actions (`.github/workflows/tauri-release.yml`)，支援自動打包 Windows、Linux 與 macOS 版本。
+### 4. 錄製功能
+- 點擊「錄製」按鈕開始擷取畫面。
+- 若使用檔案播放模式，點擊「自動渲染」會從頭播放並錄製整首歌曲。
 
-### 如何觸發發布流：
-1.  **更新版本號**: 修改 `package.json` 中的 `"version"`。
-2.  **推送標籤 (Tag)**:
-    ```bash
-    git tag v0.1.0  # 替換成你的版本號
-    git push origin v0.1.0
-    ```
-3.  **檢查 Release**: 前往 GitHub 倉庫的 **Releases** 頁面，Actions 會在完成後自動將產出的檔案上傳至該處（約 15-20 分鐘）。
+## 🛠️ 系統需求
+- **Windows**: 支援 Windows 10/11。
+- **macOS**: 支援 macOS 10.15+。
 
-## 🔧 Linux 編譯依賴
-若要在 Linux 環境本地編譯，需先安裝以下套件：
-```bash
-sudo apt update
-sudo apt install -y libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev build-essential
-```
+## 🌐 語言支援
+- 繁體中文
+- English
 
-## 📝 技術筆記
-- **Identifier**: 專案標示符已更改為 `com.sonicpulse.visualizer`，請勿隨意更動以免導致打包失敗。
-- **透明視窗**: 覆蓋模式 (Overlay) 已在 `App.tsx` 中實作，支援透明背景與滑鼠穿透設定。
+---
+Made with ❤️ by Barian
