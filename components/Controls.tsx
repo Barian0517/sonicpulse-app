@@ -318,7 +318,7 @@ const Controls: React.FC<ControlsProps> = ({
                                 <div className={`text-sm font-bold ${audioState.mode === 'file' ? 'text-white' : 'text-gray-300'}`}>{t.audio.file}</div>
                                 <div className="text-xs text-gray-500 truncate">{audioState.fileName || t.audio.fileDesc}</div>
                             </div>
-                            <input type="file" accept="audio/*" multiple className="hidden" onChange={onFileSelect} />
+                            <input type="file" accept="audio/*,.flac" multiple className="hidden" onChange={onFileSelect} />
                         </label>
                         
                         {/* Direct Render Button for Files */}

@@ -900,7 +900,7 @@ const App: React.FC = () => {
             isPlaying={audioState.isPlaying}
             currentTime={currentTime}
             duration={duration}
-            volume={audioState.volume || 0.7}
+            volume={audioState.volume ?? 0.7}
             onTogglePlay={togglePlay}
             onSeek={handleSeek}
             onVolumeChange={handleVolumeChange}

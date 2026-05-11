@@ -175,7 +175,7 @@ const Player: React.FC<PlayerProps> = ({
                         <input 
                             type="range" min="0" max="1" step="0.01" value={volume}
                             onChange={(e) => onVolumeChange(parseFloat(e.target.value))}
-                            className="w-16 h-1 bg-white/10 rounded-full appearance-none cursor-pointer accent-blue-500"
+                            className="w-24 h-1.5 bg-white/10 rounded-full appearance-none cursor-pointer accent-blue-500 hover:bg-white/20 transition-colors"
                         />
                     </div>
 
