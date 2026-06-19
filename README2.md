@@ -48,6 +48,7 @@
 
 - **跨域 (CORS)**：導入音樂檔案時必須使用 `URL.createObjectURL`，否則 Canvas `captureStream` 可能因汙染 (Tainted Canvas) 無法錄製。
 - **Windows 版本限制**：Windows 的 MSI/NSIS 打包器只接受 `x.y.z` 格式，不支援 `pre-release` 標籤（如 `-alpha`）。
+- **平台兼容性**：目前僅對 Windows 平台進行深度優化與測試。macOS/Linux 因權限與音訊驅動差異，目前仍不穩定。
 
 ---
 *Last Updated: 2026-05-11*
