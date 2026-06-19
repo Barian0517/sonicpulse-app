@@ -3,6 +3,7 @@ export enum VisualizerShape {
   Circle = 'Circle',
   Line = 'Line',
   Sphere = 'Sphere',
+  Grid3D = 'Grid3D',
 }
 
 export enum VisualizerDirection {
@@ -82,6 +83,17 @@ export interface VisualizerConfig {
   particleCount: number; // 0 - 500
   particleSpeed: number; // 0.1 - 5
   particleSize: number; // 0.1 - 5
+  
+  // Grid3D Triggers
+  grid3D_pulseEnable: boolean;
+  grid3D_pulseSensitivity: number;
+  grid3D_pulseCooldown: number;
+  grid3D_pulseStrength: number;
+  
+  grid3D_meteorEnable: boolean;
+  grid3D_meteorSensitivity: number;
+  grid3D_meteorCooldown: number;
+  grid3D_meteorStrength: number;
 }
 
 export interface AudioSourceState {

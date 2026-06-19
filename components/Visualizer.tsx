@@ -1,6 +1,7 @@
 
 import React, { useRef, useEffect, useImperativeHandle, forwardRef } from 'react';
 import { VisualizerConfig, VisualizerShape, VisualizerDirection, VisualizerStyle, SymmetryMode, VisualizerMaterial } from '../types';
+import { ThreeVisualizer } from './ThreeGrid/ThreeVisualizer';
 
 interface VisualizerProps {
   analyser: AnalyserNode | null;
@@ -196,7 +197,11 @@ const Visualizer = forwardRef<HTMLCanvasElement, VisualizerProps>(({ analyser, c
         sampleMix = config.smoothing * 2;
     }
 
-    analyser.smoothingTimeConstant = effectiveTimeConstant;
+    if (config.shape === VisualizerShape.Grid3D) {
+        analyser.smoothingTimeConstant = 0.8;
+    } else {
+        analyser.smoothingTimeConstant = effectiveTimeConstant;
+    }
     analyser.getByteFrequencyData(dataArray);
 
     const data = getProcessedData(dataArray, config.barCount, config.symmetry, sampleMix);
@@ -264,6 +269,11 @@ const Visualizer = forwardRef<HTMLCanvasElement, VisualizerProps>(({ analyser, c
     // SPHERE (3D) RENDERING
     if (config.shape === VisualizerShape.Sphere) {
         drawSphere(ctx, data, cx, cy, startRgb, endRgb);
+        return; 
+    }
+
+    // GRID (3D) RENDERING
+    if (config.shape === VisualizerShape.Grid3D) {
         return; 
     }
 
@@ -469,6 +479,8 @@ const Visualizer = forwardRef<HTMLCanvasElement, VisualizerProps>(({ analyser, c
         });
   };
 
+
+
   const drawParticle3D = (ctx: CanvasRenderingContext2D, x: number, y: number, radius: number, r: number, g: number, b: number) => {
         if (radius <= 0.1 || !isFinite(x) || !isFinite(y)) return;
         
@@ -595,10 +607,17 @@ const Visualizer = forwardRef<HTMLCanvasElement, VisualizerProps>(({ analyser, c
   }, [analyser, config]);
 
   return (
-    <canvas 
-      ref={canvasRef} 
-      className="absolute top-0 left-0 w-full h-full pointer-events-none z-10"
-    />
+    <>
+      <canvas 
+        ref={canvasRef} 
+        className="absolute top-0 left-0 w-full h-full pointer-events-none z-10"
+      />
+      {config.shape === VisualizerShape.Grid3D && (
+        <div className="absolute top-0 left-0 w-full h-full z-10">
+           <ThreeVisualizer analyser={analyser} config={config} />
+        </div>
+      )}
+    </>
   );
 });
 

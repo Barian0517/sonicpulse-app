@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { VisualizerConfig, VisualizerShape, VisualizerDirection, VisualizerStyle, VisualizerMaterial, SymmetryMode, AudioSourceState, VisualizerParticleEffect } from '../types';
-import { Settings, Image as ImageIcon, Music, Mic, Monitor, Play, Volume2, Upload, Link as LinkIcon, Trash2, Globe, Target, ChevronDown, Plus, Minus, Check, Video, Eye, EyeOff, VolumeX, Circle, Sparkles } from 'lucide-react';
+import { Settings, Image as ImageIcon, Music, Mic, Monitor, Play, Volume2, Upload, Link as LinkIcon, Trash2, Globe, Target, ChevronDown, Plus, Minus, Check, Video, Eye, EyeOff, VolumeX, Circle, Sparkles, Info } from 'lucide-react';
 import { translations, Language } from '../translations';
 
 interface ControlsProps {
@@ -63,15 +63,27 @@ const Controls: React.FC<ControlsProps> = ({
   const [prevTab, setPrevTab] = useState<'audio' | 'style' | 'layout' | 'image' | 'effects'>('audio');
   const [bgUrl, setBgUrl] = useState('');
   const [outputDevices, setOutputDevices] = useState<MediaDeviceInfo[]>([]);
+  const [showCredit, setShowCredit] = useState(false);
 
   const t = translations[language];
 
-  const tabs: ('audio' | 'style' | 'layout' | 'image' | 'effects')[] = ['audio', 'style', 'layout', 'image', 'effects'];
+  const tabs: ('audio' | 'style' | 'layout' | 'image' | 'effects')[] = 
+    config.shape === VisualizerShape.Grid3D 
+      ? ['audio', 'style', 'image', 'effects']
+      : ['audio', 'style', 'layout', 'image', 'effects'];
   
   // Track previous tab for slide direction
   useEffect(() => {
     setPrevTab(activeTab);
   }, [activeTab]);
+
+  useEffect(() => {
+    if (config.shape === VisualizerShape.Grid3D) {
+      if (activeTab === 'layout') {
+        setActiveTab('style');
+      }
+    }
+  }, [config.shape, activeTab]);
 
   const getSlideClass = () => {
     const currentIndex = tabs.indexOf(activeTab);
@@ -152,6 +164,43 @@ const Controls: React.FC<ControlsProps> = ({
         <Settings size={24} className="group-hover:rotate-90 transition-transform duration-500" />
       </button>
 
+      {/* Credit Button for Grid3D */}
+      {config.shape === VisualizerShape.Grid3D && !isUIHidden && (
+        <button
+          onClick={() => setShowCredit(true)}
+          className="absolute top-4 right-4 z-40 p-2 bg-black/50 text-white rounded-full hover:bg-black/80 backdrop-blur-md transition-all duration-300 hover:scale-110 active:scale-95 group shadow-[0_0_15px_rgba(0,0,0,0.5)] border border-white/10"
+        >
+          <Info size={24} className="text-blue-400 group-hover:text-blue-300" />
+        </button>
+      )}
+
+      {/* Credit Modal */}
+      {showCredit && (
+          <div className="absolute inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-md">
+             <div className="bg-[#0f1115] border border-white/10 p-8 rounded-2xl max-w-md text-center shadow-2xl mx-4 animate-[fadeIn_0.2s_ease-out]">
+                 <div className="w-12 h-12 bg-blue-500/20 rounded-full flex items-center justify-center mx-auto mb-4 border border-blue-500/30">
+                     <Info size={24} className="text-blue-400" />
+                 </div>
+                 <h2 className="text-xl font-bold text-white mb-4">{t.credit.title}</h2>
+                 <p className="text-sm text-gray-300 mb-6 leading-relaxed">{t.credit.desc}</p>
+                 <a 
+                    href="https://github.com/yin-yizhen/sonic-topography" 
+                    target="_blank" 
+                    rel="noreferrer" 
+                    className="inline-block bg-white/5 hover:bg-white/10 px-4 py-3 rounded-lg text-blue-400 hover:text-blue-300 text-xs break-all mb-8 w-full border border-white/5 transition-all"
+                 >
+                    https://github.com/yin-yizhen/sonic-topography
+                 </a>
+                 <button 
+                    onClick={() => setShowCredit(false)} 
+                    className="px-8 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-full transition-colors text-sm font-bold shadow-lg shadow-blue-600/20 active:scale-95"
+                 >
+                     {t.credit.close}
+                 </button>
+             </div>
+          </div>
+      )}
+
       {/* Sidebar Container */}
       <div className={`absolute top-0 left-0 h-full w-80 bg-black/80 backdrop-blur-2xl text-white border-r border-white/10 z-50 flex flex-col shadow-[5px_0_30px_rgba(0,0,0,0.5)] font-sans transform transition-transform duration-500 cubic-bezier(0.2, 0, 0, 1) ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         
@@ -178,7 +227,7 @@ const Controls: React.FC<ControlsProps> = ({
                  </button>
 
                  {/* Overlay Toggle */}
-                 {(window as any).__TAURI_INTERNALS__ && (
+                 {(window as any).__TAURI_INTERNALS__ && config.shape !== VisualizerShape.Grid3D && (
                     <div className="flex bg-white/5 rounded-full p-0.5">
                         <button 
                             onClick={onLaunchOverlay}
@@ -367,37 +416,43 @@ const Controls: React.FC<ControlsProps> = ({
                         options={Object.values(VisualizerShape).map(v => ({ value: v, label: t.values[v as keyof typeof t.values] || v }))}
                         onChange={(v) => handleChange('shape', v as VisualizerShape)} 
                     />
-                    <CustomSelect 
-                        label={t.shape.style} 
-                        value={config.style} 
-                        options={Object.values(VisualizerStyle).map(v => ({ value: v, label: t.values[v as keyof typeof t.values] || v }))}
-                        onChange={(v) => handleChange('style', v as VisualizerStyle)} 
-                    />
+                    {config.shape !== VisualizerShape.Grid3D && config.shape !== VisualizerShape.Sphere && (
+                        <CustomSelect 
+                            label={t.shape.style} 
+                            value={config.style} 
+                            options={Object.values(VisualizerStyle).map(v => ({ value: v, label: t.values[v as keyof typeof t.values] || v }))}
+                            onChange={(v) => handleChange('style', v as VisualizerStyle)} 
+                        />
+                    )}
                      <CustomSelect 
                         label={t.shape.material} 
                         value={config.material || VisualizerMaterial.Standard} 
                         options={Object.values(VisualizerMaterial).map(v => ({ value: v, label: t.values[v as keyof typeof t.values] || v }))}
                         onChange={(v) => handleChange('material', v as VisualizerMaterial)} 
                     />
-                    <CustomSelect 
-                        label={t.shape.direction} 
-                        value={config.direction} 
-                        options={Object.values(VisualizerDirection).map(v => ({ value: v, label: t.values[v as keyof typeof t.values] || v }))}
-                        onChange={(v) => handleChange('direction', v as VisualizerDirection)} 
-                    />
-                </ControlGroup>
-
-                <ControlGroup label={t.shape.arrangement}>
-                    <CustomSelect 
-                        label={t.shape.symmetry} 
-                        value={config.symmetry} 
-                        options={Object.values(SymmetryMode).map(v => ({ value: v, label: t.values[v as keyof typeof t.values] || v }))}
-                        onChange={(v) => handleChange('symmetry', v as SymmetryMode)} 
-                    />
-                    {config.shape === VisualizerShape.Circle && (
-                         <Range label={t.shape.startAngle} value={config.startAngle} min={0} max={360} onChange={(v) => handleChange('startAngle', v)} />
+                    {config.shape !== VisualizerShape.Grid3D && config.shape !== VisualizerShape.Sphere && (
+                        <CustomSelect 
+                            label={t.shape.direction} 
+                            value={config.direction} 
+                            options={Object.values(VisualizerDirection).map(v => ({ value: v, label: t.values[v as keyof typeof t.values] || v }))}
+                            onChange={(v) => handleChange('direction', v as VisualizerDirection)} 
+                        />
                     )}
                 </ControlGroup>
+
+                {config.shape !== VisualizerShape.Grid3D && config.shape !== VisualizerShape.Sphere && (
+                    <ControlGroup label={t.shape.arrangement}>
+                        <CustomSelect 
+                            label={t.shape.symmetry} 
+                            value={config.symmetry} 
+                            options={Object.values(SymmetryMode).map(v => ({ value: v, label: t.values[v as keyof typeof t.values] || v }))}
+                            onChange={(v) => handleChange('symmetry', v as SymmetryMode)} 
+                        />
+                        {config.shape === VisualizerShape.Circle && (
+                             <Range label={t.shape.startAngle} value={config.startAngle} min={0} max={360} onChange={(v) => handleChange('startAngle', v)} />
+                        )}
+                    </ControlGroup>
+                )}
 
                  <ControlGroup label={t.shape.colors}>
                     <CustomSelect 
@@ -541,24 +596,68 @@ const Controls: React.FC<ControlsProps> = ({
               </div>
             )}
 
-            {/* EFFECTS TAB (PARTICLES) */}
+             {/* EFFECTS TAB (PARTICLES & 3D TRIGGERS) */}
             {activeTab === 'effects' && (
                 <div className="space-y-8">
-                     <ControlGroup label={t.particles.atmosphere}>
-                        <CustomSelect 
-                            label={t.particles.type}
-                            value={config.particleEffect}
-                            options={Object.values(VisualizerParticleEffect).map(v => ({ value: v, label: t.values[v as keyof typeof t.values] || v }))}
-                            onChange={(v) => handleChange('particleEffect', v as VisualizerParticleEffect)}
-                        />
-                        {config.particleEffect !== VisualizerParticleEffect.None && (
-                            <>
-                                <Range label={t.particles.count} value={config.particleCount} min={10} max={500} step={10} onChange={(v) => handleChange('particleCount', v)} />
-                                <Range label={t.particles.speed} value={config.particleSpeed} min={0.1} max={5} step={0.1} onChange={(v) => handleChange('particleSpeed', v)} />
-                                <Range label={t.particles.size} value={config.particleSize} min={0.1} max={5} step={0.1} onChange={(v) => handleChange('particleSize', v)} />
-                            </>
-                        )}
-                     </ControlGroup>
+                    {config.shape === VisualizerShape.Grid3D && (
+                        <>
+                             <ControlGroup label={t.triggers.pulseTitle}>
+                                <div className="flex items-center gap-2 mb-2">
+                                     <input 
+                                         type="checkbox" 
+                                         checked={config.grid3D_pulseEnable ?? true} 
+                                         onChange={(e) => handleChange('grid3D_pulseEnable', e.target.checked)}
+                                         className="w-4 h-4 rounded-sm border-white/20 bg-black/50"
+                                     />
+                                     <span className="text-xs text-gray-300 font-bold uppercase">{t.triggers.enablePulse}</span>
+                                </div>
+                                {(config.grid3D_pulseEnable ?? true) && (
+                                    <>
+                                        <Range label={t.triggers.sensitivity} value={config.grid3D_pulseSensitivity ?? 0.15} min={0} max={1} step={0.01} onChange={(v) => handleChange('grid3D_pulseSensitivity', v)} />
+                                        <Range label={t.triggers.strength} value={config.grid3D_pulseStrength ?? 0.2} min={0} max={1} step={0.01} onChange={(v) => handleChange('grid3D_pulseStrength', v)} />
+                                        <Range label={t.triggers.cooldown} value={config.grid3D_pulseCooldown ?? 60} min={0} max={300} step={1} onChange={(v) => handleChange('grid3D_pulseCooldown', v)} />
+                                    </>
+                                )}
+                             </ControlGroup>
+                             
+                             <ControlGroup label={t.triggers.meteorTitle}>
+                                <div className="flex items-center gap-2 mb-2">
+                                     <input 
+                                         type="checkbox" 
+                                         checked={config.grid3D_meteorEnable ?? true} 
+                                         onChange={(e) => handleChange('grid3D_meteorEnable', e.target.checked)}
+                                         className="w-4 h-4 rounded-sm border-white/20 bg-black/50"
+                                     />
+                                     <span className="text-xs text-gray-300 font-bold uppercase">{t.triggers.enableMeteor}</span>
+                                </div>
+                                {(config.grid3D_meteorEnable ?? true) && (
+                                    <>
+                                        <Range label={t.triggers.sensitivity} value={config.grid3D_meteorSensitivity ?? 0.45} min={0} max={1} step={0.01} onChange={(v) => handleChange('grid3D_meteorSensitivity', v)} />
+                                        <Range label={t.triggers.strength} value={config.grid3D_meteorStrength ?? 0.5} min={0} max={1} step={0.01} onChange={(v) => handleChange('grid3D_meteorStrength', v)} />
+                                        <Range label={t.triggers.cooldown} value={config.grid3D_meteorCooldown ?? 241} min={0} max={600} step={1} onChange={(v) => handleChange('grid3D_meteorCooldown', v)} />
+                                    </>
+                                )}
+                             </ControlGroup>
+                        </>
+                    )}
+
+                    {config.shape !== VisualizerShape.Grid3D && (
+                        <ControlGroup label={t.particles.atmosphere}>
+                            <CustomSelect 
+                                label={t.particles.type}
+                                value={config.particleEffect}
+                                options={Object.values(VisualizerParticleEffect).map(v => ({ value: v, label: t.values[v as keyof typeof t.values] || v }))}
+                                onChange={(v) => handleChange('particleEffect', v as VisualizerParticleEffect)}
+                            />
+                            {config.particleEffect !== VisualizerParticleEffect.None && (
+                                <>
+                                    <Range label={t.particles.count} value={config.particleCount} min={10} max={500} step={10} onChange={(v) => handleChange('particleCount', v)} />
+                                    <Range label={t.particles.speed} value={config.particleSpeed} min={0.1} max={5} step={0.1} onChange={(v) => handleChange('particleSpeed', v)} />
+                                    <Range label={t.particles.size} value={config.particleSize} min={0.1} max={5} step={0.1} onChange={(v) => handleChange('particleSize', v)} />
+                                </>
+                            )}
+                        </ControlGroup>
+                    )}
                 </div>
             )}
 

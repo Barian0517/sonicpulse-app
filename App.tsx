@@ -46,6 +46,16 @@ const DEFAULT_CONFIG: VisualizerConfig = {
   particleCount: 100,
   particleSpeed: 1,
   particleSize: 1,
+
+  grid3D_pulseEnable: true,
+  grid3D_pulseSensitivity: 0.15,
+  grid3D_pulseCooldown: 60,
+  grid3D_pulseStrength: 0.2,
+  
+  grid3D_meteorEnable: true,
+  grid3D_meteorSensitivity: 0.45,
+  grid3D_meteorCooldown: 241,
+  grid3D_meteorStrength: 0.5,
 };
 
 const STORAGE_KEY_CONFIG = 'sonicpulse_config';
@@ -272,6 +282,15 @@ const App: React.FC = () => {
       alert("Failed to launch overlay: " + e.message);
     }
   };
+
+  // Close overlay automatically if Grid3D is selected
+  useEffect(() => {
+    if (config.shape === VisualizerShape.Grid3D && hasOverlay && overlayWindowRef.current) {
+        overlayWindowRef.current.close().catch(console.error);
+        overlayWindowRef.current = null;
+        setHasOverlay(false);
+    }
+  }, [config.shape, hasOverlay]);
 
   const toggleOverlayLock = async () => {
     if (!overlayWindowRef.current) return;

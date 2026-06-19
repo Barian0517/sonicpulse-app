@@ -15,12 +15,17 @@ export const translations = {
       file: "File Upload",
       fileDesc: "Select MP3/WAV",
       render: "Render Video",
-      recording: "Recording...",
+      recording: "Recording",
       output: "OUTPUT SPEAKER",
       defaultSpeaker: "Default Speaker",
+      input: "INPUT SOURCE DEVICE",
+      defaultMic: "Default Microphone / Input",
       bgImage: "BACKGROUND SOURCE",
       pasteUrl: "Paste Image URL...",
       upload: "Upload Image",
+      wasapi: "WASAPI Loopback (Win)",
+      wasapiDesc: "Natively capture any output device",
+      wasapiDevice: "Capture Output Device",
     },
     shape: {
       form: "FORM",
@@ -72,15 +77,6 @@ export const translations = {
       speed: "Speed",
       size: "Size"
     },
-    triggers: {
-      pulseTitle: "PULSE TRIGGER (BASS)",
-      enablePulse: "Enable Pulse",
-      meteorTitle: "METEOR TRIGGER (HIGH)",
-      enableMeteor: "Enable Meteor",
-      sensitivity: "Sensitivity",
-      strength: "Strength",
-      cooldown: "Cooldown (frames)"
-    },
     controls: {
         hideUI: "Hide UI",
         showUI: "Show UI",
@@ -89,16 +85,10 @@ export const translations = {
         record: "Record",
         stopRecord: "Stop Rec"
     },
-    credit: {
-        title: "Implementation Credit",
-        desc: "This 3D Grid visualization mode was implemented by referencing and porting the following open-source project:",
-        close: "Close"
-    },
     values: {
       Circle: "Circle",
       Line: "Line",
       Sphere: "Sphere (3D)",
-      Grid3D: "Grid (3D)",
       "Out/Up": "Out/Up",
       "In/Down": "In/Down",
       Both: "Both",
@@ -133,9 +123,14 @@ export const translations = {
       recording: "錄製中...",
       output: "輸出裝置",
       defaultSpeaker: "預設喇叭",
+      input: "輸入裝置",
+      defaultMic: "預設麥克風 / 輸入源",
       bgImage: "圖片來源",
       pasteUrl: "貼上圖片網址...",
       upload: "上傳圖片",
+      wasapi: "WASAPI 內錄監聽 (Win)",
+      wasapiDesc: "免立體聲混音與虛擬音效卡，原生監聽指定喇叭/耳機輸出",
+      wasapiDevice: "監聽輸出裝置選擇",
     },
     shape: {
       form: "型態設定",
@@ -187,15 +182,6 @@ export const translations = {
       speed: "飄動速度",
       size: "粒子大小"
     },
-    triggers: {
-      pulseTitle: "脈衝觸發器 (重低音)",
-      enablePulse: "啟用脈衝漣漪",
-      meteorTitle: "流星觸發器 (高音)",
-      enableMeteor: "啟用流星墜落",
-      sensitivity: "觸發靈敏度",
-      strength: "效果強度",
-      cooldown: "冷卻時間 (幀數)"
-    },
     controls: {
         hideUI: "隱藏介面",
         showUI: "顯示介面",
@@ -204,16 +190,10 @@ export const translations = {
         record: "開始錄製",
         stopRecord: "停止錄製"
     },
-    credit: {
-        title: "實作參考聲明",
-        desc: "此 3D 網格可視化模式是參考並移植自以下開源專案所實作而成：",
-        close: "關閉"
-    },
     values: {
       Circle: "圓形",
       Line: "直線",
       Sphere: "立體球形 (3D)",
-      Grid3D: "立體網格 (3D)",
       "Out/Up": "向外 / 向上",
       "In/Down": "向內 / 向下",
       Both: "雙向",
@@ -251,6 +231,9 @@ export const translations = {
       bgImage: "背景ソース",
       pasteUrl: "画像URLを貼り付け...",
       upload: "画像をアップロード",
+      wasapi: "WASAPI ループバック (Win)",
+      wasapiDesc: "仮想オーディオ不要、指定された出力デバイスを直接録音",
+      wasapiDevice: "キャプチャ対象デバイス選択",
     },
     shape: {
       form: "フォーム",
@@ -302,15 +285,6 @@ export const translations = {
       speed: "速度",
       size: "サイズ"
     },
-    triggers: {
-      pulseTitle: "パルス トリガー (低音)",
-      enablePulse: "パルスを有効にする",
-      meteorTitle: "メテオ トリガー (高音)",
-      enableMeteor: "メテオを有効にする",
-      sensitivity: "感度",
-      strength: "強さ",
-      cooldown: "クールダウン (フレーム)"
-    },
     controls: {
         hideUI: "UIを隠す",
         showUI: "UIを表示",
@@ -319,16 +293,10 @@ export const translations = {
         record: "録画開始",
         stopRecord: "録画停止"
     },
-    credit: {
-        title: "実装リファレンス",
-        desc: "この 3D グリッド ビジュアライゼーション モードは、以下のオープンソース プロジェクトを参照・移植して実装されました：",
-        close: "閉じる"
-    },
     values: {
       Circle: "円形",
       Line: "線形",
       Sphere: "球体 (3D)",
-      Grid3D: "グリッド (3D)",
       "Out/Up": "外 / 上",
       "In/Down": "内 / 下",
       Both: "両方",
