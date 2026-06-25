@@ -31,6 +31,8 @@ const DEFAULT_CONFIG: VisualizerConfig = {
   colorStart: '#00ffff',
   colorEnd: '#ff00ff',
   smoothing: 0.85,
+  backgroundMode: 'image',
+  backgroundColor: '#0a0a0a',
   backgroundImage: null,
   bgShakeIntensity: 0,
   bgShakeSmoothing: 0.5,
@@ -893,7 +895,7 @@ const App: React.FC = () => {
 
       {/* Recording Status / Timer (Top Right) */}
       {isRecording && (
-        <div className="absolute top-4 right-16 z-50 flex items-center gap-3 bg-red-900/40 backdrop-blur-md border border-red-500/30 text-white px-4 py-2 rounded-full animate-pulse shadow-[0_0_15px_rgba(239,68,68,0.3)]">
+        <div className="absolute top-4 left-16 z-50 flex items-center gap-3 bg-red-900/40 backdrop-blur-md border border-red-500/30 text-white px-4 py-2 rounded-full animate-pulse shadow-[0_0_15px_rgba(239,68,68,0.3)]">
           <Circle size={10} fill="currentColor" className="text-red-500" />
           <span className="text-sm font-mono font-bold tracking-widest">{formatTimer(recordingTime)}</span>
         </div>
@@ -901,7 +903,7 @@ const App: React.FC = () => {
 
       {/* Show UI Trigger (Visible when UI is hidden) */}
       {isUIHidden && (
-        <div className="absolute top-4 left-4 z-50">
+        <div className="absolute top-4 right-4 z-50">
           <button
             onClick={() => setIsUIHidden(false)}
             className="p-2 bg-black/40 text-white/50 hover:text-white rounded-full backdrop-blur-md transition-all border border-white/5 hover:border-white/20 hover:scale-110 active:scale-95 shadow-xl"

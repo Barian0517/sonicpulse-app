@@ -59,31 +59,20 @@ const Controls: React.FC<ControlsProps> = ({
   hasOverlay
 }) => {
   const [isOpen, setIsOpen] = useState(true);
-  const [activeTab, setActiveTab] = useState<'audio' | 'style' | 'layout' | 'image' | 'effects'>('audio');
-  const [prevTab, setPrevTab] = useState<'audio' | 'style' | 'layout' | 'image' | 'effects'>('audio');
+  const [activeTab, setActiveTab] = useState<'audio' | 'style' | 'layout' | 'effects'>('audio');
+  const [prevTab, setPrevTab] = useState<'audio' | 'style' | 'layout' | 'effects'>('audio');
   const [bgUrl, setBgUrl] = useState('');
   const [outputDevices, setOutputDevices] = useState<MediaDeviceInfo[]>([]);
   const [showCredit, setShowCredit] = useState(false);
 
   const t = translations[language];
 
-  const tabs: ('audio' | 'style' | 'layout' | 'image' | 'effects')[] = 
-    config.shape === VisualizerShape.Grid3D 
-      ? ['audio', 'style', 'image', 'effects']
-      : ['audio', 'style', 'layout', 'image', 'effects'];
+  const tabs: ('audio' | 'style' | 'layout' | 'effects')[] = ['audio', 'style', 'layout', 'effects'];
   
   // Track previous tab for slide direction
   useEffect(() => {
     setPrevTab(activeTab);
   }, [activeTab]);
-
-  useEffect(() => {
-    if (config.shape === VisualizerShape.Grid3D) {
-      if (activeTab === 'layout') {
-        setActiveTab('style');
-      }
-    }
-  }, [config.shape, activeTab]);
 
   const getSlideClass = () => {
     const currentIndex = tabs.indexOf(activeTab);
@@ -142,7 +131,7 @@ const Controls: React.FC<ControlsProps> = ({
   // If UI is completely hidden, only show the "Show" trigger
   if (isUIHidden) {
       return (
-          <div className="absolute top-4 left-4 z-50 group">
+          <div className="absolute top-4 right-4 z-50 group">
               <button 
                   onClick={onToggleUI}
                   className="p-3 bg-black/40 text-white/50 hover:text-white rounded-full backdrop-blur-md transition-all border border-white/5 hover:border-white/20 hover:scale-110 active:scale-95 shadow-xl"
@@ -159,7 +148,7 @@ const Controls: React.FC<ControlsProps> = ({
       {/* Settings Toggle (Visible when closed) */}
       <button 
         onClick={() => setIsOpen(true)}
-        className={`absolute top-4 left-4 z-40 p-2 bg-black/50 text-white rounded-full hover:bg-black/80 backdrop-blur-md transition-all duration-300 hover:scale-110 active:scale-95 group shadow-[0_0_15px_rgba(0,0,0,0.5)] ${isOpen ? 'opacity-0 pointer-events-none -translate-x-10' : 'opacity-100 translate-x-0'}`}
+        className={`absolute top-4 right-4 z-40 p-2 bg-black/50 text-white rounded-full hover:bg-black/80 backdrop-blur-md transition-all duration-300 hover:scale-110 active:scale-95 group shadow-[0_0_15px_rgba(0,0,0,0.5)] ${isOpen ? 'opacity-0 pointer-events-none translate-x-10' : 'opacity-100 translate-x-0'}`}
       >
         <Settings size={24} className="group-hover:rotate-90 transition-transform duration-500" />
       </button>
@@ -168,7 +157,7 @@ const Controls: React.FC<ControlsProps> = ({
       {config.shape === VisualizerShape.Grid3D && !isUIHidden && (
         <button
           onClick={() => setShowCredit(true)}
-          className="absolute top-4 right-4 z-40 p-2 bg-black/50 text-white rounded-full hover:bg-black/80 backdrop-blur-md transition-all duration-300 hover:scale-110 active:scale-95 group shadow-[0_0_15px_rgba(0,0,0,0.5)] border border-white/10"
+          className="absolute top-4 left-4 z-40 p-2 bg-black/50 text-white rounded-full hover:bg-black/80 backdrop-blur-md transition-all duration-300 hover:scale-110 active:scale-95 group shadow-[0_0_15px_rgba(0,0,0,0.5)] border border-white/10"
         >
           <Info size={24} className="text-blue-400 group-hover:text-blue-300" />
         </button>
@@ -202,7 +191,7 @@ const Controls: React.FC<ControlsProps> = ({
       )}
 
       {/* Sidebar Container */}
-      <div className={`absolute top-0 left-0 h-full w-80 bg-black/80 backdrop-blur-2xl text-white border-r border-white/10 z-50 flex flex-col shadow-[5px_0_30px_rgba(0,0,0,0.5)] font-sans transform transition-transform duration-500 cubic-bezier(0.2, 0, 0, 1) ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+      <div className={`absolute top-0 right-0 h-full w-80 bg-black/80 backdrop-blur-2xl text-white border-l border-white/10 z-50 flex flex-col shadow-[-5px_0_30px_rgba(0,0,0,0.5)] font-sans transform transition-transform duration-500 cubic-bezier(0.2, 0, 0, 1) ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}>
         
         {/* Header Action Bar */}
         <div className="p-3 border-b border-white/10 flex items-center justify-between shrink-0 bg-white/5">
@@ -485,179 +474,206 @@ const Controls: React.FC<ControlsProps> = ({
             {/* LAYOUT TAB */}
             {activeTab === 'layout' && (
               <div className="space-y-8">
-                <ControlGroup label={t.layout.dimensions}>
-                    <Range label={t.layout.size} value={config.radius} min={10} max={500} onChange={(v) => handleChange('radius', v)} />
-                    <Range label={t.layout.count} value={config.barCount} min={16} max={512} step={1} onChange={(v) => handleChange('barCount', v)} />
-                    <Range label={t.layout.width} value={config.barWidth} min={1} max={50} onChange={(v) => handleChange('barWidth', v)} />
-                    {config.shape === VisualizerShape.Line && (
-                        <Range label={t.layout.gap} value={config.linearGap} min={0} max={50} onChange={(v) => handleChange('linearGap', v)} />
-                    )}
-                    <Range label={t.layout.sensitivity} value={config.barLengthScale} min={0.1} max={5} step={0.1} onChange={(v) => handleChange('barLengthScale', v)} />
-                </ControlGroup>
+                {config.shape !== VisualizerShape.Grid3D && (
+                  <>
+                    <ControlGroup label={t.layout.position}>
+                        <div className="flex justify-between items-center mb-2">
+                            <span className="text-xs font-bold text-gray-500 uppercase flex items-center gap-2">
+                                 <span className="w-1 h-3 bg-green-500 rounded-full"></span>
+                                 XY Coordinates
+                            </span>
+                            <button 
+                                onClick={handleCenterPosition} 
+                                className="flex items-center gap-1 text-[10px] font-bold bg-white/5 hover:bg-white/10 text-blue-400 px-2 py-1 rounded-md transition-all active:scale-95"
+                            >
+                                <Target size={12} />
+                                CENTER
+                            </button>
+                        </div>
+                        <Range label={t.layout.centerX} value={config.centerX} min={0} max={100} onChange={(v) => handleChange('centerX', v)} />
+                        <Range label={t.layout.centerY} value={config.centerY} min={0} max={100} onChange={(v) => handleChange('centerY', v)} />
+                    </ControlGroup>
 
-                <ControlGroup label={t.layout.position}>
-                    <div className="flex justify-between items-center mb-2">
-                        <span className="text-xs font-bold text-gray-500 uppercase flex items-center gap-2">
-                             <span className="w-1 h-3 bg-green-500 rounded-full"></span>
-                             XY Coordinates
-                        </span>
-                        <button 
-                            onClick={handleCenterPosition} 
-                            className="flex items-center gap-1 text-[10px] font-bold bg-white/5 hover:bg-white/10 text-blue-400 px-2 py-1 rounded-md transition-all active:scale-95"
-                        >
-                            <Target size={12} />
-                            CENTER
-                        </button>
-                    </div>
-                    <Range label={t.layout.centerX} value={config.centerX} min={0} max={100} onChange={(v) => handleChange('centerX', v)} />
-                    <Range label={t.layout.centerY} value={config.centerY} min={0} max={100} onChange={(v) => handleChange('centerY', v)} />
-                </ControlGroup>
+                    <ControlGroup label={t.layout.dimensions}>
+                        <Range label={t.layout.size} value={config.radius} min={10} max={500} onChange={(v) => handleChange('radius', v)} />
+                        <Range label={t.layout.count} value={config.barCount} min={16} max={512} step={1} onChange={(v) => handleChange('barCount', v)} />
+                        <Range label={t.layout.width} value={config.barWidth} min={1} max={50} onChange={(v) => handleChange('barWidth', v)} />
+                        {config.shape === VisualizerShape.Line && (
+                            <Range label={t.layout.gap} value={config.linearGap} min={0} max={50} onChange={(v) => handleChange('linearGap', v)} />
+                        )}
+                        <Range label={t.layout.sensitivity} value={config.barLengthScale} min={0.1} max={5} step={0.1} onChange={(v) => handleChange('barLengthScale', v)} />
+                    </ControlGroup>
 
-                <ControlGroup label={t.layout.effects}>
-                    <Range label={t.layout.shake} value={config.shakeFactor} min={0} max={50} onChange={(v) => handleChange('shakeFactor', v)} />
-                    <Range label={t.layout.smoothing} value={config.smoothing} min={0} max={0.99} step={0.01} onChange={(v) => handleChange('smoothing', v)} />
-                </ControlGroup>
-              </div>
-            )}
+                    <ControlGroup label={t.layout.effects}>
+                        <Range label={t.layout.shake} value={config.shakeFactor} min={0} max={50} onChange={(v) => handleChange('shakeFactor', v)} />
+                        <Range label={t.layout.smoothing} value={config.smoothing} min={0} max={0.99} step={0.01} onChange={(v) => handleChange('smoothing', v)} />
+                    </ControlGroup>
+                  </>
+                )}
 
-            {/* IMAGE TAB */}
-            {activeTab === 'image' && (
-              <div className="space-y-8">
-                 <div className="space-y-3">
-                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-2">
-                     <ImageIcon size={12} />
-                     {t.audio.bgImage}
-                  </label>
-                  
-                  <div className="flex gap-2">
-                    <input 
-                      type="text" 
-                      value={bgUrl}
-                      onChange={(e) => setBgUrl(e.target.value)}
-                      placeholder={t.audio.pasteUrl}
-                      className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-blue-500 focus:bg-white/10 transition-all font-mono placeholder-gray-600"
-                    />
-                    <button 
-                      onClick={handleUrlSubmit}
-                      className="bg-blue-600 hover:bg-blue-500 active:scale-95 p-2 rounded-lg text-white transition-all shadow-lg shadow-blue-600/20"
-                    >
-                      <LinkIcon size={14} />
-                    </button>
-                  </div>
-
-                  <div className="flex gap-2">
-                      <label className="flex-1 flex items-center justify-center gap-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg py-2.5 cursor-pointer text-xs font-medium transition-all active:scale-95">
-                          <Upload size={14} className="text-gray-400" />
-                          <span>{t.audio.upload}</span>
-                          <input type="file" accept="image/*" onChange={handleFileUpload} className="hidden" />
-                      </label>
-                      {config.backgroundImage && (
-                        <button 
-                            onClick={() => handleChange('backgroundImage', null)}
-                            className="p-2.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 rounded-lg transition-all active:scale-95"
-                        >
-                            <Trash2 size={14} />
-                        </button>
-                      )}
-                  </div>
-                </div>
-
-                {config.backgroundImage && (
-                    <>
-                        <ControlGroup label={t.image.effects}>
-                             <Range label={t.image.shake} value={config.bgShakeIntensity} min={0} max={100} onChange={(v) => handleChange('bgShakeIntensity', v)} />
-                             <Range label={t.image.smoothing} value={config.bgShakeSmoothing} min={0} max={0.99} step={0.01} onChange={(v) => handleChange('bgShakeSmoothing', v)} />
-                             <Range label={t.image.vignette} value={config.bgVignette} min={0} max={100} onChange={(v) => handleChange('bgVignette', v)} />
-                             <Range label={t.image.float} value={config.bgFloatSpeed} min={0} max={5} step={0.1} onChange={(v) => handleChange('bgFloatSpeed', v)} />
-                        </ControlGroup>
-
-                        <ControlGroup label={t.image.transform}>
-                             <Range label={t.image.scale} value={config.bgScale} min={0.1} max={3} step={0.1} onChange={(v) => handleChange('bgScale', v)} />
-                             <Range label={t.image.rotation} value={config.bgRotation} min={0} max={360} onChange={(v) => handleChange('bgRotation', v)} />
-                             
-                             <div className="flex justify-between items-center mb-2">
-                                <span className="text-xs font-bold text-gray-500 uppercase flex items-center gap-2">
-                                     <span className="w-1 h-3 bg-purple-500 rounded-full"></span>
-                                     {t.image.position}
-                                </span>
-                                <button 
-                                    onClick={handleBgCenterPosition} 
-                                    className="flex items-center gap-1 text-[10px] font-bold bg-white/5 hover:bg-white/10 text-blue-400 px-2 py-1 rounded-md transition-all active:scale-95"
-                                >
-                                    <Target size={12} />
-                                    CENTER
-                                </button>
-                            </div>
-                            <Range label={t.layout.centerX} value={config.bgPositionX} min={0} max={100} onChange={(v) => handleChange('bgPositionX', v)} />
-                            <Range label={t.layout.centerY} value={config.bgPositionY} min={0} max={100} onChange={(v) => handleChange('bgPositionY', v)} />
-                        </ControlGroup>
-                    </>
+                {config.shape === VisualizerShape.Grid3D && (
+                  <>
+                     <ControlGroup label={t.triggers.pulseTitle}>
+                        <div className="flex items-center gap-2 mb-2">
+                             <input 
+                                 type="checkbox" 
+                                 checked={config.grid3D_pulseEnable ?? true} 
+                                 onChange={(e) => handleChange('grid3D_pulseEnable', e.target.checked)}
+                                 className="w-4 h-4 rounded-sm border-white/20 bg-black/50"
+                             />
+                             <span className="text-xs text-gray-300 font-bold uppercase">{t.triggers.enablePulse}</span>
+                        </div>
+                        {(config.grid3D_pulseEnable ?? true) && (
+                            <>
+                                <Range label={t.triggers.sensitivity} value={config.grid3D_pulseSensitivity ?? 0.15} min={0} max={1} step={0.01} onChange={(v) => handleChange('grid3D_pulseSensitivity', v)} />
+                                <Range label={t.triggers.strength} value={config.grid3D_pulseStrength ?? 0.2} min={0} max={1} step={0.01} onChange={(v) => handleChange('grid3D_pulseStrength', v)} />
+                                <Range label={t.triggers.cooldown} value={config.grid3D_pulseCooldown ?? 60} min={0} max={300} step={1} onChange={(v) => handleChange('grid3D_pulseCooldown', v)} />
+                            </>
+                        )}
+                     </ControlGroup>
+                     
+                     <ControlGroup label={t.triggers.meteorTitle}>
+                        <div className="flex items-center gap-2 mb-2">
+                             <input 
+                                 type="checkbox" 
+                                 checked={config.grid3D_meteorEnable ?? true} 
+                                 onChange={(e) => handleChange('grid3D_meteorEnable', e.target.checked)}
+                                 className="w-4 h-4 rounded-sm border-white/20 bg-black/50"
+                             />
+                             <span className="text-xs text-gray-300 font-bold uppercase">{t.triggers.enableMeteor}</span>
+                        </div>
+                        {(config.grid3D_meteorEnable ?? true) && (
+                            <>
+                                <Range label={t.triggers.sensitivity} value={config.grid3D_meteorSensitivity ?? 0.45} min={0} max={1} step={0.01} onChange={(v) => handleChange('grid3D_meteorSensitivity', v)} />
+                                <Range label={t.triggers.strength} value={config.grid3D_meteorStrength ?? 0.5} min={0} max={1} step={0.01} onChange={(v) => handleChange('grid3D_meteorStrength', v)} />
+                                <Range label={t.triggers.cooldown} value={config.grid3D_meteorCooldown ?? 241} min={0} max={600} step={1} onChange={(v) => handleChange('grid3D_meteorCooldown', v)} />
+                            </>
+                        )}
+                     </ControlGroup>
+                  </>
                 )}
               </div>
             )}
 
-             {/* EFFECTS TAB (PARTICLES & 3D TRIGGERS) */}
+             {/* EFFECTS TAB (PARTICLES & IMAGE) */}
             {activeTab === 'effects' && (
                 <div className="space-y-8">
-                    {config.shape === VisualizerShape.Grid3D && (
+                    <ControlGroup label={t.image.background}>
+                      <div className="space-y-4">
+                        <div className="flex gap-2 bg-black/40 p-1 rounded-lg border border-white/10">
+                            <button 
+                                className={`flex-1 text-xs font-bold py-1.5 rounded-md transition-all ${config.backgroundMode !== 'solid' ? 'bg-white/20 text-white' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
+                                onClick={() => handleChange('backgroundMode', 'image')}
+                            >
+                                {t.image.modeImage}
+                            </button>
+                            <button 
+                                className={`flex-1 text-xs font-bold py-1.5 rounded-md transition-all ${config.backgroundMode === 'solid' ? 'bg-white/20 text-white' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
+                                onClick={() => handleChange('backgroundMode', 'solid')}
+                            >
+                                {t.image.modeSolid}
+                            </button>
+                        </div>
+
+                        {config.backgroundMode === 'solid' ? (
+                            <div className="space-y-4 pt-2">
+                                <div className="flex items-center gap-3">
+                                    <input 
+                                        type="color" 
+                                        value={config.backgroundColor || '#0a0a0a'} 
+                                        onChange={(e) => handleChange('backgroundColor', e.target.value)}
+                                        className="w-8 h-8 rounded cursor-pointer bg-transparent border-0 p-0"
+                                    />
+                                    <span className="text-xs font-bold text-gray-400">{t.image.color}</span>
+                                </div>
+                                <Range label={t.image.vignette} value={config.bgVignette} min={0} max={100} onChange={(v) => handleChange('bgVignette', v)} />
+                            </div>
+                        ) : (
+                            <div className="space-y-3 pt-2">
+                                <div className="flex gap-2">
+                                  <input 
+                                    type="text" 
+                                    value={bgUrl}
+                                    onChange={(e) => setBgUrl(e.target.value)}
+                                    placeholder={t.audio.pasteUrl}
+                                    className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-blue-500 focus:bg-white/10 transition-all font-mono placeholder-gray-600"
+                                  />
+                                  <button 
+                                    onClick={handleUrlSubmit}
+                                    className="bg-blue-600 hover:bg-blue-500 active:scale-95 p-2 rounded-lg text-white transition-all shadow-lg shadow-blue-600/20"
+                                  >
+                                    <LinkIcon size={14} />
+                                  </button>
+                                </div>
+
+                                <div className="flex gap-2">
+                                    <label className="flex-1 flex items-center justify-center gap-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg py-2.5 cursor-pointer text-xs font-medium transition-all active:scale-95">
+                                        <Upload size={14} className="text-gray-400" />
+                                        <span>{t.audio.upload}</span>
+                                        <input type="file" accept="image/*" onChange={handleFileUpload} className="hidden" />
+                                    </label>
+                                    {config.backgroundImage && (
+                                      <button 
+                                          onClick={() => handleChange('backgroundImage', null)}
+                                          className="p-2.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 rounded-lg transition-all active:scale-95"
+                                      >
+                                          <Trash2 size={14} />
+                                      </button>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+                      </div>
+                    </ControlGroup>
+
+                    {config.backgroundMode !== 'solid' && config.backgroundImage && (
                         <>
-                             <ControlGroup label={t.triggers.pulseTitle}>
-                                <div className="flex items-center gap-2 mb-2">
-                                     <input 
-                                         type="checkbox" 
-                                         checked={config.grid3D_pulseEnable ?? true} 
-                                         onChange={(e) => handleChange('grid3D_pulseEnable', e.target.checked)}
-                                         className="w-4 h-4 rounded-sm border-white/20 bg-black/50"
-                                     />
-                                     <span className="text-xs text-gray-300 font-bold uppercase">{t.triggers.enablePulse}</span>
+                            <ControlGroup label={t.image.effects}>
+                                 <Range label={t.image.shake} value={config.bgShakeIntensity} min={0} max={100} onChange={(v) => handleChange('bgShakeIntensity', v)} />
+                                 <Range label={t.image.smoothing} value={config.bgShakeSmoothing} min={0} max={0.99} step={0.01} onChange={(v) => handleChange('bgShakeSmoothing', v)} />
+                                 <Range label={t.image.vignette} value={config.bgVignette} min={0} max={100} onChange={(v) => handleChange('bgVignette', v)} />
+                                 <Range label={t.image.float} value={config.bgFloatSpeed} min={0} max={5} step={0.1} onChange={(v) => handleChange('bgFloatSpeed', v)} />
+                            </ControlGroup>
+
+                            <ControlGroup label={t.image.transform}>
+                                 <Range label={t.image.scale} value={config.bgScale} min={0.1} max={3} step={0.1} onChange={(v) => handleChange('bgScale', v)} />
+                                 <Range label={t.image.rotation} value={config.bgRotation} min={0} max={360} onChange={(v) => handleChange('bgRotation', v)} />
+                                 
+                                 <div className="flex justify-between items-center mb-2">
+                                    <span className="text-xs font-bold text-gray-500 uppercase flex items-center gap-2">
+                                         <span className="w-1 h-3 bg-purple-500 rounded-full"></span>
+                                         {t.image.position}
+                                    </span>
+                                    <button 
+                                        onClick={handleBgCenterPosition} 
+                                        className="flex items-center gap-1 text-[10px] font-bold bg-white/5 hover:bg-white/10 text-blue-400 px-2 py-1 rounded-md transition-all active:scale-95"
+                                    >
+                                        <Target size={12} />
+                                        CENTER
+                                    </button>
                                 </div>
-                                {(config.grid3D_pulseEnable ?? true) && (
-                                    <>
-                                        <Range label={t.triggers.sensitivity} value={config.grid3D_pulseSensitivity ?? 0.15} min={0} max={1} step={0.01} onChange={(v) => handleChange('grid3D_pulseSensitivity', v)} />
-                                        <Range label={t.triggers.strength} value={config.grid3D_pulseStrength ?? 0.2} min={0} max={1} step={0.01} onChange={(v) => handleChange('grid3D_pulseStrength', v)} />
-                                        <Range label={t.triggers.cooldown} value={config.grid3D_pulseCooldown ?? 60} min={0} max={300} step={1} onChange={(v) => handleChange('grid3D_pulseCooldown', v)} />
-                                    </>
-                                )}
-                             </ControlGroup>
-                             
-                             <ControlGroup label={t.triggers.meteorTitle}>
-                                <div className="flex items-center gap-2 mb-2">
-                                     <input 
-                                         type="checkbox" 
-                                         checked={config.grid3D_meteorEnable ?? true} 
-                                         onChange={(e) => handleChange('grid3D_meteorEnable', e.target.checked)}
-                                         className="w-4 h-4 rounded-sm border-white/20 bg-black/50"
-                                     />
-                                     <span className="text-xs text-gray-300 font-bold uppercase">{t.triggers.enableMeteor}</span>
-                                </div>
-                                {(config.grid3D_meteorEnable ?? true) && (
-                                    <>
-                                        <Range label={t.triggers.sensitivity} value={config.grid3D_meteorSensitivity ?? 0.45} min={0} max={1} step={0.01} onChange={(v) => handleChange('grid3D_meteorSensitivity', v)} />
-                                        <Range label={t.triggers.strength} value={config.grid3D_meteorStrength ?? 0.5} min={0} max={1} step={0.01} onChange={(v) => handleChange('grid3D_meteorStrength', v)} />
-                                        <Range label={t.triggers.cooldown} value={config.grid3D_meteorCooldown ?? 241} min={0} max={600} step={1} onChange={(v) => handleChange('grid3D_meteorCooldown', v)} />
-                                    </>
-                                )}
-                             </ControlGroup>
+                                <Range label={t.layout.centerX} value={config.bgPositionX} min={0} max={100} onChange={(v) => handleChange('bgPositionX', v)} />
+                                <Range label={t.layout.centerY} value={config.bgPositionY} min={0} max={100} onChange={(v) => handleChange('bgPositionY', v)} />
+                            </ControlGroup>
                         </>
                     )}
 
-                    {config.shape !== VisualizerShape.Grid3D && (
-                        <ControlGroup label={t.particles.atmosphere}>
-                            <CustomSelect 
-                                label={t.particles.type}
-                                value={config.particleEffect}
-                                options={Object.values(VisualizerParticleEffect).map(v => ({ value: v, label: t.values[v as keyof typeof t.values] || v }))}
-                                onChange={(v) => handleChange('particleEffect', v as VisualizerParticleEffect)}
-                            />
-                            {config.particleEffect !== VisualizerParticleEffect.None && (
-                                <>
-                                    <Range label={t.particles.count} value={config.particleCount} min={10} max={500} step={10} onChange={(v) => handleChange('particleCount', v)} />
-                                    <Range label={t.particles.speed} value={config.particleSpeed} min={0.1} max={5} step={0.1} onChange={(v) => handleChange('particleSpeed', v)} />
-                                    <Range label={t.particles.size} value={config.particleSize} min={0.1} max={5} step={0.1} onChange={(v) => handleChange('particleSize', v)} />
-                                </>
-                            )}
-                        </ControlGroup>
-                    )}
+
+                    <ControlGroup label={t.particles.atmosphere}>
+                        <CustomSelect 
+                            label={t.particles.type}
+                            value={config.particleEffect}
+                            options={Object.values(VisualizerParticleEffect).map(v => ({ value: v, label: t.values[v as keyof typeof t.values] || v }))}
+                            onChange={(v) => handleChange('particleEffect', v as VisualizerParticleEffect)}
+                        />
+                        {config.particleEffect !== VisualizerParticleEffect.None && (
+                            <>
+                                <Range label={t.particles.count} value={config.particleCount} min={10} max={500} step={10} onChange={(v) => handleChange('particleCount', v)} />
+                                <Range label={t.particles.speed} value={config.particleSpeed} min={0.1} max={5} step={0.1} onChange={(v) => handleChange('particleSpeed', v)} />
+                                <Range label={t.particles.size} value={config.particleSize} min={0.1} max={5} step={0.1} onChange={(v) => handleChange('particleSize', v)} />
+                            </>
+                        )}
+                    </ControlGroup>
                 </div>
             )}
 

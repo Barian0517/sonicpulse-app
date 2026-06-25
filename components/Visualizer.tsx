@@ -522,75 +522,91 @@ const Visualizer = forwardRef<HTMLCanvasElement, VisualizerProps>(({ analyser, c
   };
 
   const drawBackground = (ctx: CanvasRenderingContext2D, width: number, height: number, bassAvg: number) => {
-     if (!config.backgroundImage || !bgImageRef.current.complete || !bgImageRef.current.src) return;
-
-     ctx.save();
-     
-     const time = performance.now() * 0.001;
-     let floatX = 0;
-     let floatY = 0;
-     if (config.bgFloatSpeed > 0) {
-         floatX = Math.sin(time * config.bgFloatSpeed) * 20;
-         floatY = Math.cos(time * (config.bgFloatSpeed * 0.8)) * 15;
-     }
-
-     let shakeScale = 0;
-     const shakeThreshold = 20; 
-
-     if (config.bgShakeIntensity > 0 && bassAvg > shakeThreshold) {
-         const normalizedBass = Math.max(0, (bassAvg - shakeThreshold) / (255 - shakeThreshold));
-         const bassForce = Math.pow(normalizedBass, 2);
-         const targetShake = bassForce * (config.bgShakeIntensity / 100) * 0.5;
-         
-         const attack = 0.2;
-         const decay = config.bgShakeSmoothing || 0.5; 
-
-         if (targetShake > prevBgShakeRef.current) {
-             prevBgShakeRef.current = prevBgShakeRef.current * (1 - attack) + targetShake * attack;
-         } else {
-             prevBgShakeRef.current = prevBgShakeRef.current * decay + targetShake * (1 - decay);
-         }
-         
-         shakeScale = prevBgShakeRef.current;
+     if (config.backgroundMode === 'solid') {
+         ctx.fillStyle = config.backgroundColor || '#0a0a0a';
+         ctx.fillRect(0, 0, width, height);
      } else {
-         const decay = config.bgShakeSmoothing || 0.5;
-         prevBgShakeRef.current = prevBgShakeRef.current * decay;
-         shakeScale = prevBgShakeRef.current;
-     }
+         if (!config.backgroundImage || !bgImageRef.current.complete || !bgImageRef.current.src) return;
 
-     const currentScale = config.bgScale + shakeScale;
-     const centerX = width * (config.bgPositionX / 100);
-     const centerY = height * (config.bgPositionY / 100);
-     
-     ctx.translate(centerX + floatX, centerY + floatY);
-     if (config.bgRotation !== 0) {
-         ctx.rotate((config.bgRotation * Math.PI) / 180);
-     }
-     ctx.scale(currentScale, currentScale);
+         ctx.save();
+         
+         const time = performance.now() * 0.001;
+         let floatX = 0;
+         let floatY = 0;
+         if (config.bgFloatSpeed > 0) {
+             floatX = Math.sin(time * config.bgFloatSpeed) * 20;
+             floatY = Math.cos(time * (config.bgFloatSpeed * 0.8)) * 15;
+         }
 
-     const img = bgImageRef.current;
-     
-     // Robustness check for zero-size image
-     if (img.width === 0 || img.height === 0) {
+         let shakeScale = 0;
+         const shakeThreshold = 20; 
+
+         if (config.bgShakeIntensity > 0 && bassAvg > shakeThreshold) {
+             const normalizedBass = Math.max(0, (bassAvg - shakeThreshold) / (255 - shakeThreshold));
+             const bassForce = Math.pow(normalizedBass, 2);
+             const targetShake = bassForce * (config.bgShakeIntensity / 100) * 0.5;
+             
+             const attack = 0.2;
+             const decay = config.bgShakeSmoothing || 0.5; 
+
+             if (targetShake > prevBgShakeRef.current) {
+                 prevBgShakeRef.current = prevBgShakeRef.current * (1 - attack) + targetShake * attack;
+             } else {
+                 prevBgShakeRef.current = prevBgShakeRef.current * decay + targetShake * (1 - decay);
+             }
+             
+             shakeScale = prevBgShakeRef.current;
+         } else {
+             const decay = config.bgShakeSmoothing || 0.5;
+             prevBgShakeRef.current = prevBgShakeRef.current * decay;
+             shakeScale = prevBgShakeRef.current;
+         }
+
+         const currentScale = config.bgScale + shakeScale;
+         const centerX = width * (config.bgPositionX / 100);
+         const centerY = height * (config.bgPositionY / 100);
+         
+         ctx.translate(centerX + floatX, centerY + floatY);
+         if (config.bgRotation !== 0) {
+             ctx.rotate((config.bgRotation * Math.PI) / 180);
+         }
+         ctx.scale(currentScale, currentScale);
+
+         const img = bgImageRef.current;
+         
+         // Robustness check for zero-size image
+         if (img.width === 0 || img.height === 0) {
+             ctx.restore();
+             return;
+         }
+
+         let drawW = width;
+         let drawH = width * (img.height / img.width);
+         if (drawH < height) {
+             drawH = height;
+             drawW = height * (img.width / img.height);
+         }
+
+         ctx.drawImage(img, -drawW/2, -drawH/2, drawW, drawH);
+         
          ctx.restore();
-         return;
      }
-
-     let drawW = width;
-     let drawH = width * (img.height / img.width);
-     if (drawH < height) {
-         drawH = height;
-         drawW = height * (img.width / img.height);
-     }
-
-     ctx.drawImage(img, -drawW/2, -drawH/2, drawW, drawH);
-     
-     ctx.restore();
 
      if (config.bgVignette > 0) {
          ctx.globalCompositeOperation = 'source-over'; 
-         const gradient = ctx.createRadialGradient(width/2, height/2, width * 0.3, width/2, height/2, width * 0.9);
-         const intensity = config.bgVignette / 100;
+         const vignetteAmount = config.bgVignette / 100;
+         
+         // Dynamically shrink the clear center area as vignette increases
+         // At 0%: inner = 40% of max dimension (mostly clear)
+         // At 100%: inner = 5% of max dimension (almost all affected)
+         const maxDim = Math.max(width, height);
+         const innerRadius = maxDim * (0.4 - (0.35 * vignetteAmount));
+         const outerRadius = maxDim * (0.8 - (0.2 * vignetteAmount));
+         
+         // Increase darkness curve slightly so it feels stronger at max
+         const intensity = Math.min(1.0, vignetteAmount * 1.5);
+         
+         const gradient = ctx.createRadialGradient(width/2, height/2, innerRadius, width/2, height/2, outerRadius);
          gradient.addColorStop(0, `rgba(0,0,0,0)`);
          gradient.addColorStop(1, `rgba(0,0,0,${intensity})`);
          

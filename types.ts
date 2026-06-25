@@ -68,6 +68,8 @@ export interface VisualizerConfig {
   smoothing: number; // 0 - 0.99
   
   // Background
+  backgroundMode: 'image' | 'solid';
+  backgroundColor: string;
   backgroundImage: string | null;
   bgShakeIntensity: number; // 0 - 100
   bgShakeSmoothing: number; // 0 - 0.99

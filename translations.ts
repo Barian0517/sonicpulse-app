@@ -4,7 +4,7 @@ export type Language = 'en' | 'zh' | 'ja';
 export const translations = {
   en: {
     appTitle: "SonicPulse by 幽影櫻",
-    tabs: { audio: "Audio", style: "Shape", layout: "Details", image: "Image", effects: "Effects" },
+    tabs: { audio: "Audio", style: "Shape", layout: "Visualizer", image: "Image", effects: "Basic" },
     audio: {
       inputSource: "INPUT SOURCE",
       system: "System Audio",
@@ -54,6 +54,10 @@ export const translations = {
       smoothing: "Smoothing"
     },
     image: {
+      background: "BACKGROUND",
+      modeImage: "Image",
+      modeSolid: "Solid Color",
+      color: "Color",
       source: "SOURCE",
       effects: "EFFECTS",
       shake: "Shake Amplitude",
@@ -119,7 +123,7 @@ export const translations = {
   },
   zh: {
     appTitle: "SonicPulse 音頻律動 by 幽影櫻",
-    tabs: { audio: "音訊", style: "外型", layout: "細節", image: "圖片", effects: "特效" },
+    tabs: { audio: "音訊", style: "外型", layout: "視覺化設定", image: "圖片", effects: "基礎" },
     audio: {
       inputSource: "輸入來源",
       system: "系統音效",
@@ -169,6 +173,10 @@ export const translations = {
       smoothing: "律動平滑度"
     },
     image: {
+      background: "背景設定",
+      modeImage: "背景圖片",
+      modeSolid: "單色底色",
+      color: "底色",
       source: "來源設定",
       effects: "動態特效",
       shake: "震動幅度",
@@ -234,7 +242,7 @@ export const translations = {
   },
   ja: {
     appTitle: "SonicPulse by 幽影櫻",
-    tabs: { audio: "オーディオ", style: "形状", layout: "詳細", image: "画像", effects: "エフェクト" },
+    tabs: { audio: "オーディオ", style: "形状", layout: "ビジュアライザー設定", image: "画像", effects: "基本" },
     audio: {
       inputSource: "入力ソース",
       system: "システム音声",
@@ -284,6 +292,10 @@ export const translations = {
       smoothing: "スムージング"
     },
     image: {
+      background: "背景",
+      modeImage: "画像",
+      modeSolid: "単一色",
+      color: "カラー",
       source: "ソース",
       effects: "エフェクト",
       shake: "振動の強さ",
