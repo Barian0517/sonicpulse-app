@@ -16,6 +16,7 @@
     "core:window:allow-set-position",
     "core:window:allow-close",
     "core:window:allow-start-dragging",
-    "core:window:allow-destroy"
+    "core:window:allow-destroy",
+    "dialog:default"
   ]
 }

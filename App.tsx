@@ -1,13 +1,13 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 
 import Visualizer from './components/Visualizer';
 import Controls from './components/Controls';
 import Player from './components/Player';
 import ParticleOverlay from './components/ParticleOverlay';
+import { MusicPlayerLayout } from './components/MusicPlayer/MusicPlayerLayout';
 import { VisualizerConfig, VisualizerShape, VisualizerDirection, VisualizerStyle, SymmetryMode, AudioSourceState, VisualizerMaterial, VisualizerParticleEffect } from './types';
 import { translations, Language } from './translations';
-import { Maximize2, Minimize2, Eye, Circle, X, Move } from 'lucide-react';
+import { Maximize2, Minimize2, Eye, Circle, X, Move, Music } from 'lucide-react';
 
 
 
@@ -122,6 +122,7 @@ const App: React.FC = () => {
 
   // UI State
   const [isUIHidden, setIsUIHidden] = useState(false);
+  const [isMusicPlayerOpen, setIsMusicPlayerOpen] = useState(false);
   const [isGlobalMute, setIsGlobalMute] = useState(() => {
     try {
       return localStorage.getItem(STORAGE_KEY_MUTE) === 'true';
@@ -328,9 +329,10 @@ const App: React.FC = () => {
   // Audio Refs
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
-  const sourceRef = useRef<MediaStreamAudioSourceNode | MediaElementAudioSourceNode | null>(null);
+  const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
+  const mediaElementSourceRef = useRef<MediaElementAudioSourceNode | null>(null);
   const gainNodeRef = useRef<GainNode | null>(null);
-  const masterGainRef = useRef<GainNode | null>(null); // Global Mute
+  const masterGainRef = useRef<GainNode | null>(null);
   const audioElementRef = useRef<HTMLAudioElement | null>(null);
 
   // Hidden video ref for maintaining system audio stream lifecycle
@@ -359,6 +361,11 @@ const App: React.FC = () => {
       // Recording Destination
       const dest = audioContextRef.current.createMediaStreamDestination();
       destRef.current = dest;
+
+      // Create MediaElementSource ONCE for the audio element
+      if (audioElementRef.current) {
+        mediaElementSourceRef.current = audioContextRef.current.createMediaElementSource(audioElementRef.current);
+      }
     }
     if (audioContextRef.current.state === 'suspended') {
       audioContextRef.current.resume();
@@ -526,13 +533,16 @@ const App: React.FC = () => {
     audioElementRef.current.load();
     audioElementRef.current.play().catch(console.error);
 
-    const source = audioContextRef.current.createMediaElementSource(audioElementRef.current);
-    source.connect(analyserRef.current);
-    analyserRef.current.connect(gainNodeRef.current);
-    gainNodeRef.current.connect(masterGainRef.current);
-    source.connect(destRef.current);
+    if (mediaElementSourceRef.current) {
+      // Disconnect first just in case to prevent multiple connections
+      mediaElementSourceRef.current.disconnect();
+      
+      mediaElementSourceRef.current.connect(analyserRef.current);
+      analyserRef.current.connect(gainNodeRef.current);
+      gainNodeRef.current.connect(masterGainRef.current);
+      mediaElementSourceRef.current.connect(destRef.current);
+    }
 
-    sourceRef.current = source;
     setAudioState(prev => ({
       ...prev,
       isPlaying: true,
@@ -860,6 +870,33 @@ const App: React.FC = () => {
         count={config.particleCount}
         speed={config.particleSpeed}
         size={config.particleSize}
+      />
+
+      <div className="absolute top-4 left-4 z-40 flex items-center gap-3">
+        <button
+            onClick={() => setIsMusicPlayerOpen(true)}
+            className="group flex items-center justify-center w-12 h-12 bg-black/40 hover:bg-black/60 backdrop-blur-md rounded-full border border-white/10 hover:border-purple-500/50 shadow-lg transition-all"
+            title="Open Music Player"
+        >
+            <Music size={20} className="text-white group-hover:text-purple-400 transition-colors" />
+        </button>
+      </div>
+
+      <MusicPlayerLayout 
+          isOpen={isMusicPlayerOpen} 
+          onClose={() => setIsMusicPlayerOpen(false)} 
+          audioElementRef={audioElementRef}
+          onPlay={(trackUrl, title, coverUrl) => {
+              // Convert to the format App.tsx expects
+              const mapped = {
+                  name: title,
+                  url: trackUrl,
+                  file: null
+              };
+              setPlaylist([mapped]);
+              setCurrentTrackIndex(0);
+              playTrack(mapped);
+          }}
       />
 
       {/* Visualizer (Now handles background internally) */}

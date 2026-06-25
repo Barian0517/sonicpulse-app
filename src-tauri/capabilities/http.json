@@ -1,0 +1,19 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "http-request",
+  "description": "Allows making HTTP requests",
+  "windows": [
+    "main",
+    "overlay"
+  ],
+  "permissions": [
+    "http:default",
+    {
+      "identifier": "http:allow-fetch",
+      "allow": [
+        { "url": "http://**" },
+        { "url": "https://**" }
+      ]
+    }
+  ]
+}
