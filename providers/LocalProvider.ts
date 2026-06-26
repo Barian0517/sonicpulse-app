@@ -1,5 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
-import { MusicProvider, Track, Album, Playlist } from './MusicProvider';
+import { convertFileSrc } from '@tauri-apps/api/core';
+import { MusicProvider, Track, Album, Playlist, Artist } from './MusicProvider';
 
 interface RustTrackMetadata {
     id: string;
@@ -15,6 +16,7 @@ export class LocalProvider implements MusicProvider {
     name = 'Local';
     private tracks: Track[] = [];
     private albumsMap: Map<string, Album> = new Map();
+    private get albums(): Album[] { return Array.from(this.albumsMap.values()); }
     private isScanned = false;
 
     async init(directory: string): Promise<void> {
@@ -52,19 +54,48 @@ export class LocalProvider implements MusicProvider {
         }
     }
 
-    async search(query: string): Promise<{ tracks: Track[]; albums: Album[]; }> {
+    async search(query: string): Promise<{ artists: Artist[], tracks: Track[]; albums: Album[]; }> {
         const lower = query.toLowerCase();
-        const tracks = this.tracks.filter(t => 
-            t.title.toLowerCase().includes(lower) || 
-            t.artist.toLowerCase().includes(lower) || 
-            t.album.toLowerCase().includes(lower)
-        );
-        const albums = Array.from(this.albumsMap.values()).filter(a => 
+        
+        const albums = this.albums.filter(a => 
             a.name.toLowerCase().includes(lower) || 
             a.artist.toLowerCase().includes(lower)
         );
-        return { tracks, albums };
+        
+        const tracks = this.tracks.filter(t => 
+            t.title.toLowerCase().includes(lower) || 
+            t.artist.toLowerCase().includes(lower) ||
+            t.album.toLowerCase().includes(lower)
+        );
+
+        const artists: Artist[] = []; // Local doesn't track artists yet
+
+        return { artists, tracks, albums };
     }
+
+    async getIndexes(): Promise<{ index: string, artists: Artist[] }[]> { return []; }
+    async getArtist(id: string): Promise<{ artist: Artist, albums: Album[] }> { throw new Error('Not implemented'); }
+    async getAlbum(id: string): Promise<{ album: Album, tracks: Track[] }> {
+        const album = this.albums.find(a => a.id === id);
+        if (!album) throw new Error("Album not found");
+        return { album, tracks: await this.getAlbumTracks(id) };
+    }
+    async getSong(id: string): Promise<Track> {
+        const track = this.tracks.find(t => t.id === id);
+        if (!track) throw new Error("Song not found");
+        return track;
+    }
+
+    async star(id: string, type: 'track' | 'album' | 'artist', star: boolean): Promise<void> {}
+    async setRating(id: string, rating: number): Promise<void> {}
+    async getStarred(): Promise<{ artists: Artist[], albums: Album[], tracks: Track[] }> {
+        return { artists: [], albums: [], tracks: [] };
+    }
+
+    async createPlaylist(name: string): Promise<Playlist> { throw new Error('Not implemented'); }
+    async updatePlaylist(id: string, name?: string, tracksToAdd?: string[], tracksToRemove?: number[]): Promise<void> {}
+    async deletePlaylist(id: string): Promise<void> {}
+    async downloadTrack(trackId: string): Promise<void> {}
 
     async getTopAlbums(): Promise<Album[]> {
         return Array.from(this.albumsMap.values());
@@ -110,8 +141,8 @@ export class LocalProvider implements MusicProvider {
         return undefined;
     }
 
-    async getLyrics(trackId: string): Promise<string | null> {
-        const track = this.tracks.find(t => t.id === trackId);
+    async getLyrics(trackInfo: Track): Promise<string | null> {
+        const track = this.tracks.find(t => t.id === trackInfo.id);
         if (!track || !track.streamUrl) return null;
         try {
             const lrc: string | null = await invoke('read_lrc_file', { filePath: track.streamUrl });

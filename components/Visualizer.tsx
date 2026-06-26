@@ -2,11 +2,13 @@
 import React, { useRef, useEffect, useImperativeHandle, forwardRef } from 'react';
 import { VisualizerConfig, VisualizerShape, VisualizerDirection, VisualizerStyle, SymmetryMode, VisualizerMaterial } from '../types';
 import { ThreeVisualizer } from './ThreeGrid/ThreeVisualizer';
+import { PresetVisualizer } from './Visualizer/PresetVisualizer';
 
 interface VisualizerProps {
   analyser: AnalyserNode | null;
   config: VisualizerConfig;
   isOverlay?: boolean;
+  albumCoverUrl?: string | null;
 }
 
 // Helper to parse hex color to RGB
@@ -19,7 +21,7 @@ const hexToRgb = (hex: string) => {
   } : { r: 255, g: 255, b: 255 };
 };
 
-const Visualizer = forwardRef<HTMLCanvasElement, VisualizerProps>(({ analyser, config, isOverlay = false }, ref) => {
+const Visualizer = forwardRef<HTMLCanvasElement, VisualizerProps>(({ analyser, config, isOverlay = false, albumCoverUrl = null }, ref) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const requestRef = useRef<number | null>(null);
   const dataArrayRef = useRef<Uint8Array | null>(null);
@@ -29,6 +31,7 @@ const Visualizer = forwardRef<HTMLCanvasElement, VisualizerProps>(({ analyser, c
   // Overlay state
   const overlayDataRef = useRef<{data: number[], bassAvg: number} | null>(null);
   const overlayConfigRef = useRef<VisualizerConfig>(config);
+  const overlayCoverRef = useRef<string | null>(null);
 
   useEffect(() => {
     channelRef.current = new BroadcastChannel('sonicpulse_sync');
@@ -37,6 +40,7 @@ const Visualizer = forwardRef<HTMLCanvasElement, VisualizerProps>(({ analyser, c
            if (e.data.type === 'sync') {
                overlayDataRef.current = { data: e.data.data, bassAvg: e.data.bassAvg };
                overlayConfigRef.current = e.data.config;
+               overlayCoverRef.current = e.data.albumCoverUrl;
            }
        };
     }
@@ -221,7 +225,8 @@ const Visualizer = forwardRef<HTMLCanvasElement, VisualizerProps>(({ analyser, c
             type: 'sync',
             data: data,
             bassAvg: bassAvg,
-            config: config
+            config: config,
+            albumCoverUrl: albumCoverUrl
         });
     }
 
@@ -272,8 +277,8 @@ const Visualizer = forwardRef<HTMLCanvasElement, VisualizerProps>(({ analyser, c
         return; 
     }
 
-    // GRID (3D) RENDERING
-    if (config.shape === VisualizerShape.Grid3D) {
+    // 3D RENDERING OVERLAYS
+    if (config.shape === VisualizerShape.Grid3D || config.shape === VisualizerShape.PresetEmily) {
         return; 
     }
 
@@ -631,6 +636,13 @@ const Visualizer = forwardRef<HTMLCanvasElement, VisualizerProps>(({ analyser, c
       {config.shape === VisualizerShape.Grid3D && (
         <div className="absolute top-0 left-0 w-full h-full z-10">
            <ThreeVisualizer analyser={analyser} config={config} />
+        </div>
+      )}
+      {[
+         VisualizerShape.PresetEmily
+       ].includes(config.shape) && (
+        <div className="absolute top-0 left-0 w-full h-full z-10">
+           <PresetVisualizer analyser={analyser} config={config} albumCoverUrl={isOverlay ? overlayCoverRef.current : albumCoverUrl} />
         </div>
       )}
     </>

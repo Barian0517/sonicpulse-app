@@ -11,7 +11,7 @@ interface PlayerProps {
   onSeek: (time: number) => void;
   onVolumeChange: (volume: number) => void;
   
-  playlist?: {name: string, url: string}[];
+  playlist?: {name: string, url: string, track?: any}[];
   currentIndex?: number;
   onNext?: () => void;
   onPrev?: () => void;
@@ -64,12 +64,35 @@ const Player: React.FC<PlayerProps> = ({
   };
 
   // Handle dragging/clicking progress bar
-  const handleProgressClick = (e: React.MouseEvent<HTMLDivElement>) => {
+  const handleProgressMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    e.preventDefault(); // Prevent text selection while dragging
     if (!progressBarRef.current || duration === 0) return;
     const rect = progressBarRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const percentage = Math.min(Math.max(x / rect.width, 0), 1);
-    onSeek(percentage * duration);
+    
+    const updateSeek = (clientX: number) => {
+        const x = clientX - rect.left;
+        const percentage = Math.min(Math.max(x / rect.width, 0), 1);
+        setLocalSeek(percentage * duration);
+    };
+    
+    updateSeek(e.clientX);
+    
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+        updateSeek(moveEvent.clientX);
+    };
+    
+    const handleMouseUp = (upEvent: MouseEvent) => {
+        window.removeEventListener('mousemove', handleMouseMove);
+        window.removeEventListener('mouseup', handleMouseUp);
+        
+        const finalX = upEvent.clientX - rect.left;
+        const percentage = Math.min(Math.max(finalX / rect.width, 0), 1);
+        onSeek(percentage * duration);
+        setLocalSeek(null);
+    };
+    
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
   };
 
   const displayTime = localSeek !== null ? localSeek : currentTime;
@@ -83,8 +106,12 @@ const Player: React.FC<PlayerProps> = ({
         className="absolute bottom-8 left-1/2 -translate-x-1/2 z-40 cursor-pointer animate-[fadeIn_0.3s_ease-out]"
       >
         <div className="bg-black/60 backdrop-blur-xl border border-white/10 rounded-full pl-2 pr-6 py-2 shadow-2xl shadow-blue-900/20 flex items-center gap-3 group transition-all hover:scale-105 hover:bg-black/70 hover:border-blue-500/30">
-          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center shrink-0 animate-[spin_4s_linear_infinite]" style={{ animationPlayState: isPlaying ? 'running' : 'paused' }}>
-            <Music size={14} className="text-white" />
+          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center shrink-0 overflow-hidden animate-[spin_4s_linear_infinite]" style={{ animationPlayState: isPlaying ? 'running' : 'paused' }}>
+            {playlist[currentIndex]?.track?.coverUrl ? (
+               <img src={playlist[currentIndex]?.track?.coverUrl} className="w-full h-full object-cover" />
+            ) : (
+               <Music size={14} className="text-white" />
+            )}
           </div>
           <div className="flex flex-col">
              <div className="flex items-center gap-2">
@@ -149,10 +176,14 @@ const Player: React.FC<PlayerProps> = ({
                 <div className="flex items-center gap-6">
                     {/* Disc Animation */}
                     <div className="relative w-20 h-20 shrink-0">
-                        <div className={`w-full h-full rounded-full bg-gradient-to-br from-gray-800 to-gray-900 border-4 border-white/5 flex items-center justify-center shadow-2xl animate-[spin_12s_linear_infinite]`} style={{ animationPlayState: isPlaying ? 'running' : 'paused' }}>
-                            <div className="w-6 h-6 rounded-full bg-red-600/20 border border-red-500/30 flex items-center justify-center">
-                                <div className="w-2 h-2 rounded-full bg-red-500 shadow-[0_0_10px_red]" />
-                            </div>
+                        <div className={`w-full h-full rounded-full bg-gradient-to-br from-gray-800 to-gray-900 border-4 border-white/5 flex items-center justify-center shadow-2xl overflow-hidden animate-[spin_12s_linear_infinite]`} style={{ animationPlayState: isPlaying ? 'running' : 'paused' }}>
+                            {playlist[currentIndex]?.track?.coverUrl ? (
+                                <img src={playlist[currentIndex]?.track?.coverUrl} className="w-full h-full object-cover" />
+                            ) : (
+                                <div className="w-6 h-6 rounded-full bg-red-600/20 border border-red-500/30 flex items-center justify-center">
+                                    <div className="w-2 h-2 rounded-full bg-red-500 shadow-[0_0_10px_red]" />
+                                </div>
+                            )}
                         </div>
                         {/* Needle / Stylus */}
                         <div className={`absolute -top-1 -right-1 w-1 h-8 bg-blue-500/40 rounded-full origin-top transition-transform duration-500 ${isPlaying ? 'rotate-[15deg]' : 'rotate-0'}`} />
@@ -204,12 +235,14 @@ const Player: React.FC<PlayerProps> = ({
                     <div 
                         ref={progressBarRef}
                         className="h-2 bg-white/5 rounded-full cursor-pointer relative group/progress overflow-hidden"
-                        onClick={handleProgressClick}
+                        onMouseDown={handleProgressMouseDown}
                     >
                         <div 
-                            className="absolute top-0 left-0 h-full bg-gradient-to-r from-blue-500 to-blue-400 transition-all duration-100"
+                            className="absolute top-0 left-0 h-full bg-gradient-to-r from-blue-500 to-blue-400 transition-all duration-100 relative"
                             style={{ width: `${progressPercent}%` }}
-                        />
+                        >
+                            <div className={`absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full shadow-[0_0_8px_rgba(255,255,255,0.8)] opacity-0 group-hover/progress:opacity-100 ${localSeek !== null ? '!opacity-100' : ''} transition-opacity translate-x-1/2`} />
+                        </div>
                     </div>
                     <div className="flex justify-between text-[10px] font-black text-gray-500 font-mono tracking-tighter">
                         <span>{formatTime(displayTime)}</span>

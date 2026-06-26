@@ -4,6 +4,7 @@ export enum VisualizerShape {
   Line = 'Line',
   Sphere = 'Sphere',
   Grid3D = 'Grid3D',
+  PresetEmily = 'PresetEmily',
 }
 
 export enum VisualizerDirection {
@@ -96,6 +97,48 @@ export interface VisualizerConfig {
   grid3D_meteorSensitivity: number;
   grid3D_meteorCooldown: number;
   grid3D_meteorStrength: number;
+
+  // Lyrics (字幕)
+  lyricsEnabled: boolean;
+  
+  // Style Toggles
+  lyricsBlurEnabled: boolean;
+  lyricsBgBlurEnabled: boolean;
+  lyricsGlowEnabled: boolean;
+  lyricsStrokeEnabled: boolean;
+  lyricsBgEnabled: boolean;
+  
+  // Position & Arc
+  lyricsPositionX: number; // -100 to 100
+  lyricsPositionY: number; // -100 to 100
+  lyricsArcEnabled: boolean;
+  lyricsArcDirection: 'left' | 'right';
+  
+  lyricsFontFamily: string;
+  lyricsFontSize: number;
+  lyricsFontWeight: 'normal' | 'bold';
+  lyricsFontStyle: 'normal' | 'italic';
+  lyricsLetterSpacing: number;
+  lyricsColor: string;
+  lyricsOpacity: number;
+  
+  lyricsStrokeColor: string;
+  lyricsStrokeWidth: number;
+  
+  lyricsGlowColor: string;
+  lyricsGlowRadius: number;
+  lyricsGlowBrightness: number;
+  
+  lyricsBgColor: string;
+  lyricsBgRadius: number;
+  lyricsBgPadding: number;
+  
+  lyricsAnimEnter: 'fade' | 'typewriter' | 'wipeRight' | 'blurIn' | 'scaleIn' | 'glitch';
+  lyricsAnimExit: 'fade' | 'typewriter' | 'wipeRight' | 'blurOut' | 'scaleOut' | 'glitch';
+  lyricsAnimLoop: 'none' | 'wave' | 'bounce' | 'blink';
+
+  // Performance
+  performanceMode: boolean; // if true, disables WebGL particles and heavy glow
 }
 
 export interface AudioSourceState {

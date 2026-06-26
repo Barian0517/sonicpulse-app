@@ -3,9 +3,11 @@ import React, { useState, useRef, useEffect } from 'react';
 import Visualizer from './components/Visualizer';
 import Controls from './components/Controls';
 import Player from './components/Player';
-import ParticleOverlay from './components/ParticleOverlay';
+import { ThreeParticleVisualizer } from './components/Visualizer/ThreeParticleVisualizer';
+import { LyricsOverlay } from './components/LyricsOverlay';
 import { MusicPlayerLayout } from './components/MusicPlayer/MusicPlayerLayout';
 import { VisualizerConfig, VisualizerShape, VisualizerDirection, VisualizerStyle, SymmetryMode, AudioSourceState, VisualizerMaterial, VisualizerParticleEffect } from './types';
+import { Track } from './providers/MusicProvider';
 import { translations, Language } from './translations';
 import { Maximize2, Minimize2, Eye, Circle, X, Move, Music } from 'lucide-react';
 
@@ -43,9 +45,8 @@ const DEFAULT_CONFIG: VisualizerConfig = {
   bgPositionY: 50,
   bgRotation: 0,
 
-  // Particles
-  particleEffect: VisualizerParticleEffect.None,
-  particleCount: 100,
+  particleEffect: VisualizerParticleEffect.Sakura,
+  particleCount: 150,
   particleSpeed: 1,
   particleSize: 1,
 
@@ -58,6 +59,42 @@ const DEFAULT_CONFIG: VisualizerConfig = {
   grid3D_meteorSensitivity: 0.45,
   grid3D_meteorCooldown: 241,
   grid3D_meteorStrength: 0.5,
+
+  // Lyrics
+  lyricsEnabled: false,
+  lyricsBlurEnabled: true,
+  lyricsBgBlurEnabled: true,
+  lyricsGlowEnabled: false, // User screenshots look relatively clean, disable heavy glow by default
+  lyricsStrokeEnabled: true,
+  lyricsBgEnabled: true,
+  lyricsArcEnabled: true,
+  lyricsArcDirection: 'left',
+  lyricsPositionX: 0,
+  lyricsPositionY: 0,
+  lyricsFontFamily: 'sans-serif',
+  lyricsFontSize: 48,
+  lyricsFontWeight: 'bold',
+  lyricsFontStyle: 'normal',
+  lyricsLetterSpacing: 4,
+  lyricsColor: '#ffffff',
+  lyricsOpacity: 1,
+  
+  lyricsStrokeColor: '#000000',
+  lyricsStrokeWidth: 2,
+  
+  lyricsGlowColor: '#000000',
+  lyricsGlowRadius: 20,
+  lyricsGlowBrightness: 1,
+  
+  lyricsBgColor: '#000000',
+  lyricsBgRadius: 12,
+  lyricsBgPadding: 16,
+  
+  lyricsAnimEnter: 'fade',
+  lyricsAnimExit: 'fade',
+  lyricsAnimLoop: 'none',
+
+  performanceMode: false,
 };
 
 const STORAGE_KEY_CONFIG = 'sonicpulse_config';
@@ -114,11 +151,12 @@ const App: React.FC = () => {
   });
 
   // Player State
-  const [playlist, setPlaylist] = useState<{ name: string, url: string, file: File | null }[]>([]);
+  const [playlist, setPlaylist] = useState<{ name: string, url: string, file: File | null, track?: Track }[]>([]);
   const [currentTrackIndex, setCurrentTrackIndex] = useState(-1);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isExternalQueue, setIsExternalQueue] = useState(false);
 
   // UI State
   const [isUIHidden, setIsUIHidden] = useState(false);
@@ -330,10 +368,13 @@ const App: React.FC = () => {
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
-  const mediaElementSourceRef = useRef<MediaElementAudioSourceNode | null>(null);
+  const audio1Ref = useRef<HTMLAudioElement | null>(null);
+  const audio2Ref = useRef<HTMLAudioElement | null>(null);
+  const activePlayerRef = useRef<'audio1' | 'audio2'>('audio1');
+  const mediaElementSource1Ref = useRef<MediaElementAudioSourceNode | null>(null);
+  const mediaElementSource2Ref = useRef<MediaElementAudioSourceNode | null>(null);
   const gainNodeRef = useRef<GainNode | null>(null);
   const masterGainRef = useRef<GainNode | null>(null);
-  const audioElementRef = useRef<HTMLAudioElement | null>(null);
 
   // Hidden video ref for maintaining system audio stream lifecycle
   const hiddenVideoRef = useRef<HTMLVideoElement>(null);
@@ -362,9 +403,12 @@ const App: React.FC = () => {
       const dest = audioContextRef.current.createMediaStreamDestination();
       destRef.current = dest;
 
-      // Create MediaElementSource ONCE for the audio element
-      if (audioElementRef.current) {
-        mediaElementSourceRef.current = audioContextRef.current.createMediaElementSource(audioElementRef.current);
+      // Create MediaElementSource ONCE for both audio elements
+      if (audio1Ref.current && !mediaElementSource1Ref.current) {
+        mediaElementSource1Ref.current = audioContextRef.current.createMediaElementSource(audio1Ref.current);
+      }
+      if (audio2Ref.current && !mediaElementSource2Ref.current) {
+        mediaElementSource2Ref.current = audioContextRef.current.createMediaElementSource(audio2Ref.current);
       }
     }
     if (audioContextRef.current.state === 'suspended') {
@@ -392,10 +436,14 @@ const App: React.FC = () => {
       sourceRef.current.disconnect();
       sourceRef.current = null;
     }
-    // Pause audio file
-    if (audioElementRef.current) {
-      audioElementRef.current.pause();
-      audioElementRef.current.src = '';
+    // Pause audio files
+    if (audio1Ref.current) {
+      audio1Ref.current.pause();
+      audio1Ref.current.src = '';
+    }
+    if (audio2Ref.current) {
+      audio2Ref.current.pause();
+      audio2Ref.current.src = '';
     }
     // Stop tracks on hidden video stream (System/Mic)
     if (hiddenVideoRef.current && hiddenVideoRef.current.srcObject) {
@@ -524,23 +572,36 @@ const App: React.FC = () => {
   };
 
   const playTrack = (track: { name: string, url: string }) => {
-    cleanupAudio();
+    // Determine the next player for gapless swap
+    const nextPlayerKey = activePlayerRef.current === 'audio1' ? 'audio2' : 'audio1';
+    const nextPlayer = nextPlayerKey === 'audio1' ? audio1Ref.current : audio2Ref.current;
+    const currentPlayer = activePlayerRef.current === 'audio1' ? audio1Ref.current : audio2Ref.current;
+
     initAudioContext();
 
-    if (!audioContextRef.current || !analyserRef.current || !gainNodeRef.current || !destRef.current || !audioElementRef.current) return;
+    if (!audioContextRef.current || !analyserRef.current || !gainNodeRef.current || !destRef.current || !nextPlayer) return;
 
-    audioElementRef.current.src = track.url;
-    audioElementRef.current.load();
-    audioElementRef.current.play().catch(console.error);
+    // Load and play the new track on the inactive player
+    nextPlayer.src = track.url;
+    nextPlayer.load();
+    nextPlayer.play().catch(console.error);
 
-    if (mediaElementSourceRef.current) {
-      // Disconnect first just in case to prevent multiple connections
-      mediaElementSourceRef.current.disconnect();
-      
-      mediaElementSourceRef.current.connect(analyserRef.current);
+    // Fade out / Pause the previous player (Gapless transition)
+    if (currentPlayer && !currentPlayer.paused) {
+      currentPlayer.pause(); // For true gapless, we would fade out here or let it finish naturally if overlapping.
+      currentPlayer.src = '';
+    }
+
+    activePlayerRef.current = nextPlayerKey;
+
+    const sourceToConnect = nextPlayerKey === 'audio1' ? mediaElementSource1Ref.current : mediaElementSource2Ref.current;
+
+    if (sourceToConnect) {
+      sourceToConnect.disconnect();
+      sourceToConnect.connect(analyserRef.current);
       analyserRef.current.connect(gainNodeRef.current);
       gainNodeRef.current.connect(masterGainRef.current);
-      mediaElementSourceRef.current.connect(destRef.current);
+      sourceToConnect.connect(destRef.current);
     }
 
     setAudioState(prev => ({
@@ -553,6 +614,10 @@ const App: React.FC = () => {
   };
 
   const handleNextTrack = () => {
+    if (isExternalQueue) {
+      window.dispatchEvent(new CustomEvent('sonicpulse-play-next'));
+      return;
+    }
     if (playlist.length === 0) return;
     const nextIndex = (currentTrackIndex + 1) % playlist.length;
     setCurrentTrackIndex(nextIndex);
@@ -560,6 +625,10 @@ const App: React.FC = () => {
   };
 
   const handlePrevTrack = () => {
+    if (isExternalQueue) {
+      window.dispatchEvent(new CustomEvent('sonicpulse-play-prev'));
+      return;
+    }
     if (playlist.length === 0) return;
     const prevIndex = (currentTrackIndex - 1 + playlist.length) % playlist.length;
     setCurrentTrackIndex(prevIndex);
@@ -567,6 +636,10 @@ const App: React.FC = () => {
   };
 
   const handleSelectTrack = (index: number) => {
+    if (isExternalQueue) {
+      window.dispatchEvent(new CustomEvent('sonicpulse-play-index', { detail: index }));
+      return;
+    }
     if (index < 0 || index >= playlist.length) return;
     setCurrentTrackIndex(index);
     playTrack(playlist[index]);
@@ -576,13 +649,17 @@ const App: React.FC = () => {
     if (!audioContextRef.current) return;
 
     // For Audio Element (Files)
-    if (audioElementRef.current && 'setSinkId' in audioElementRef.current) {
+    if (audio1Ref.current && 'setSinkId' in audio1Ref.current) {
       try {
         // @ts-ignore
-        await audioElementRef.current.setSinkId(deviceId);
-      } catch (e) {
-        console.error("Failed to set sinkId on audio element", e);
-      }
+        await audio1Ref.current.setSinkId(deviceId);
+      } catch (e) { }
+    }
+    if (audio2Ref.current && 'setSinkId' in audio2Ref.current) {
+      try {
+        // @ts-ignore
+        await audio2Ref.current.setSinkId(deviceId);
+      } catch (e) { }
     }
 
     // For Web Audio Context (Mic/System Monitor)
@@ -660,12 +737,14 @@ const App: React.FC = () => {
     }
   };
 
+  const getActivePlayer = () => activePlayerRef.current === 'audio1' ? audio1Ref.current : audio2Ref.current;
+
   // Auto Render Logic (Real-time playback + Record)
   const handleAutoRender = () => {
-    if (audioState.mode !== 'file' || !audioElementRef.current) return;
+    if (audioState.mode !== 'file' || !getActivePlayer()) return;
 
     // 1. Reset Audio to Start
-    audioElementRef.current.currentTime = 0;
+    getActivePlayer()!.currentTime = 0;
     setCurrentTime(0);
 
     // 2. Start Recording
@@ -673,27 +752,29 @@ const App: React.FC = () => {
     setIsAutoRender(true);
 
     // 3. Play Audio
-    audioElementRef.current.play()
+    getActivePlayer()!.play()
       .then(() => setAudioState(prev => ({ ...prev, isPlaying: true })))
       .catch(e => console.error("Auto render play error:", e));
   };
 
   // Player Controls
   const togglePlay = () => {
-    if (audioElementRef.current) {
-      if (audioElementRef.current.paused) {
-        audioElementRef.current.play();
+    const player = getActivePlayer();
+    if (player) {
+      if (player.paused) {
+        player.play();
         setAudioState(prev => ({ ...prev, isPlaying: true }));
       } else {
-        audioElementRef.current.pause();
+        player.pause();
         setAudioState(prev => ({ ...prev, isPlaying: false }));
       }
     }
   };
 
   const handleSeek = (time: number) => {
-    if (audioElementRef.current) {
-      audioElementRef.current.currentTime = time;
+    const player = getActivePlayer();
+    if (player) {
+      player.currentTime = time;
       setCurrentTime(time);
     }
   };
@@ -746,41 +827,60 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    const el = audioElementRef.current;
-    if (!el) return;
+    const players = [audio1Ref.current, audio2Ref.current];
+    
+    const onTimeUpdate = (e: any) => {
+        if (e.target === getActivePlayer()) setCurrentTime(e.target.currentTime);
+    };
+    const onDurationChange = (e: any) => {
+        if (e.target === getActivePlayer()) setDuration(e.target.duration);
+    };
 
-    const onTimeUpdate = () => setCurrentTime(el.currentTime);
-    const onDurationChange = () => setDuration(el.duration);
-
-    const onEnded = () => {
-      if (playlist.length > 1) {
+    const onEnded = (e: any) => {
+      if (e.target !== getActivePlayer()) return;
+      
+      // If we are playing from MusicPlayerLayout's queue, we should notify it.
+      if (isExternalQueue) {
+        window.dispatchEvent(new CustomEvent('sonicpulse-track-ended'));
+      } else if (playlist.length > 1) {
         handleNextTrack();
       } else {
         setAudioState(prev => ({ ...prev, isPlaying: false }));
       }
+      
       // Auto stop recording if in auto-render mode
       if (isAutoRender && mediaRecorderRef.current?.state === 'recording') {
         handleStopRecording();
       }
     };
 
-    const onPlay = () => setAudioState(prev => ({ ...prev, isPlaying: true }));
-    const onPause = () => setAudioState(prev => ({ ...prev, isPlaying: false }));
+    const onPlay = (e: any) => {
+        if (e.target === getActivePlayer()) setAudioState(prev => ({ ...prev, isPlaying: true }));
+    };
+    const onPause = (e: any) => {
+        if (e.target === getActivePlayer()) setAudioState(prev => ({ ...prev, isPlaying: false }));
+    };
 
-    el.addEventListener('timeupdate', onTimeUpdate);
-    el.addEventListener('durationchange', onDurationChange);
-    el.addEventListener('ended', onEnded);
-    el.addEventListener('play', onPlay);
-    el.addEventListener('pause', onPause);
+    players.forEach(el => {
+        if (!el) return;
+        el.addEventListener('timeupdate', onTimeUpdate);
+        el.addEventListener('durationchange', onDurationChange);
+        el.addEventListener('ended', onEnded);
+        el.addEventListener('play', onPlay);
+        el.addEventListener('pause', onPause);
+    });
 
     return () => {
-      el.removeEventListener('timeupdate', onTimeUpdate);
-      el.removeEventListener('durationchange', onDurationChange);
-      el.removeEventListener('ended', onEnded);
-      el.removeEventListener('play', onPlay);
-      el.removeEventListener('pause', onPause);
+      players.forEach(el => {
+          if (!el) return;
+          el.removeEventListener('timeupdate', onTimeUpdate);
+          el.removeEventListener('durationchange', onDurationChange);
+          el.removeEventListener('ended', onEnded);
+          el.removeEventListener('play', onPlay);
+          el.removeEventListener('pause', onPause);
+      });
     };
-  }, [isAutoRender]); // Re-bind if isAutoRender changes (captured in closure)
+  }, [isAutoRender, playlist]);
 
   // Overlay Window internal state
   const [isThisOverlayLocked, setIsThisOverlayLocked] = useState(() => {
@@ -861,15 +961,14 @@ const App: React.FC = () => {
       {/* Hidden Video for Stream Keep-Alive */}
       <video ref={hiddenVideoRef} className="hidden" playsInline muted />
 
-      {/* Audio Element for File Playback */}
-      <audio ref={audioElementRef} className="hidden" crossOrigin="anonymous" />
+      {/* Audio Elements for File Playback */}
+      <audio ref={audio1Ref} className="hidden" crossOrigin="anonymous" />
+      <audio ref={audio2Ref} className="hidden" crossOrigin="anonymous" />
 
-      {/* Atmospheric Particles Overlay */}
-      <ParticleOverlay
-        effect={config.particleEffect}
-        count={config.particleCount}
-        speed={config.particleSpeed}
-        size={config.particleSize}
+      {/* Atmospheric Particles Overlay (WebGL) */}
+      <ThreeParticleVisualizer 
+        config={config} 
+        analyser={analyserRef.current} 
       />
 
       <div className="absolute top-4 left-4 z-40 flex items-center gap-3">
@@ -885,22 +984,55 @@ const App: React.FC = () => {
       <MusicPlayerLayout 
           isOpen={isMusicPlayerOpen} 
           onClose={() => setIsMusicPlayerOpen(false)} 
-          audioElementRef={audioElementRef}
-          onPlay={(trackUrl, title, coverUrl) => {
+          playbackState={{
+              isPlaying: audioState.isPlaying,
+              progress: currentTime,
+              duration: duration,
+              volume: audioState.volume ?? 1
+          }}
+          onTogglePlay={togglePlay}
+          onSeek={handleSeek}
+          onVolumeChange={handleVolumeChange}
+          onPlay={(trackUrl, title, coverUrl, track) => {
               // Convert to the format App.tsx expects
               const mapped = {
                   name: title,
                   url: trackUrl,
-                  file: null
+                  file: null,
+                  track: track
               };
-              setPlaylist([mapped]);
-              setCurrentTrackIndex(0);
+              // Only override playlist if we aren't using an external queue
+              if (!isExternalQueue) {
+                  setPlaylist([mapped]);
+                  setCurrentTrackIndex(0);
+              }
               playTrack(mapped);
           }}
+          onQueueUpdate={(queue, currentIndex) => {
+              setIsExternalQueue(true);
+              setPlaylist(queue.map(q => ({ name: q.title + (q.artist ? ` by ${q.artist}` : ''), url: '', file: null, track: q })));
+              setCurrentTrackIndex(currentIndex);
+          }}
+          isLyricsEnabled={config.lyricsEnabled}
+          onToggleLyrics={() => setConfig(prev => ({ ...prev, lyricsEnabled: !prev.lyricsEnabled }))}
       />
 
       {/* Visualizer (Now handles background internally) */}
-      <Visualizer ref={canvasRef} analyser={analyserRef.current} config={config} />
+      <Visualizer 
+          ref={canvasRef} 
+          analyser={analyserRef.current} 
+          config={config} 
+          albumCoverUrl={playlist[currentTrackIndex]?.track?.coverUrl || null} 
+      />
+
+      {/* Lyrics Overlay */}
+      {audioState.mode === 'file' && playlist[currentTrackIndex]?.track && (
+         <LyricsOverlay 
+             track={playlist[currentTrackIndex].track!}
+             currentTime={currentTime}
+             config={config}
+         />
+      )}
 
       {/* UI Overlay */}
       <div className={`transition-opacity duration-300 ${isUIHidden ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>

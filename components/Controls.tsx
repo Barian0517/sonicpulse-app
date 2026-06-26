@@ -59,15 +59,15 @@ const Controls: React.FC<ControlsProps> = ({
   hasOverlay
 }) => {
   const [isOpen, setIsOpen] = useState(true);
-  const [activeTab, setActiveTab] = useState<'audio' | 'style' | 'layout' | 'effects'>('audio');
-  const [prevTab, setPrevTab] = useState<'audio' | 'style' | 'layout' | 'effects'>('audio');
+  const [activeTab, setActiveTab] = useState<'audio' | 'style' | 'layout' | 'effects' | 'lyrics'>('audio');
+  const [prevTab, setPrevTab] = useState<'audio' | 'style' | 'layout' | 'effects' | 'lyrics'>('audio');
   const [bgUrl, setBgUrl] = useState('');
   const [outputDevices, setOutputDevices] = useState<MediaDeviceInfo[]>([]);
   const [showCredit, setShowCredit] = useState(false);
 
   const t = translations[language];
 
-  const tabs: ('audio' | 'style' | 'layout' | 'effects')[] = ['audio', 'style', 'layout', 'effects'];
+  const tabs: ('audio' | 'style' | 'layout' | 'effects' | 'lyrics')[] = ['audio', 'style', 'layout', 'effects', 'lyrics'];
   
   // Track previous tab for slide direction
   useEffect(() => {
@@ -157,7 +157,7 @@ const Controls: React.FC<ControlsProps> = ({
       {config.shape === VisualizerShape.Grid3D && !isUIHidden && (
         <button
           onClick={() => setShowCredit(true)}
-          className="absolute top-4 left-4 z-40 p-2 bg-black/50 text-white rounded-full hover:bg-black/80 backdrop-blur-md transition-all duration-300 hover:scale-110 active:scale-95 group shadow-[0_0_15px_rgba(0,0,0,0.5)] border border-white/10"
+          className={`absolute top-4 right-16 z-40 p-2 bg-black/50 text-white rounded-full hover:bg-black/80 backdrop-blur-md transition-all duration-300 hover:scale-110 active:scale-95 group shadow-[0_0_15px_rgba(0,0,0,0.5)] border border-white/10 ${isOpen ? 'opacity-0 pointer-events-none translate-x-10' : 'opacity-100 translate-x-0'}`}
         >
           <Info size={24} className="text-blue-400 group-hover:text-blue-300" />
         </button>
@@ -659,6 +659,24 @@ const Controls: React.FC<ControlsProps> = ({
                     )}
 
 
+                    <ControlGroup label="Performance">
+                        <div className="flex items-center gap-3 px-4 py-3 bg-white/5 rounded-xl border border-white/5">
+                            <div className="relative flex items-center">
+                                <input 
+                                    type="checkbox" 
+                                    id="perf-enable-checkbox"
+                                    checked={config.performanceMode}
+                                    onChange={(e) => handleChange('performanceMode', e.target.checked)}
+                                    className="peer h-4 w-4 cursor-pointer appearance-none rounded border border-gray-600 bg-gray-800 transition-all checked:border-blue-500 checked:bg-blue-500"
+                                />
+                                <Check size={10} className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-white opacity-0 peer-checked:opacity-100" />
+                            </div>
+                            <label htmlFor="perf-enable-checkbox" className="text-sm font-medium text-white cursor-pointer select-none">
+                                Performance Mode (Disable WebGL / Heavy Glow)
+                            </label>
+                        </div>
+                    </ControlGroup>
+
                     <ControlGroup label={t.particles.atmosphere}>
                         <CustomSelect 
                             label={t.particles.type}
@@ -675,6 +693,171 @@ const Controls: React.FC<ControlsProps> = ({
                         )}
                     </ControlGroup>
                 </div>
+            )}
+
+            {/* LYRICS TAB */}
+            {activeTab === 'lyrics' && (
+              <div className="space-y-8">
+                  <ControlGroup label={t.lyrics.enable}>
+                      <div className="flex items-center gap-3 px-4 py-3 bg-white/5 rounded-xl border border-white/5">
+                          <div className="relative flex items-center">
+                              <input 
+                                  type="checkbox" 
+                                  id="lyrics-enable-checkbox"
+                                  checked={config.lyricsEnabled}
+                                  onChange={(e) => handleChange('lyricsEnabled', e.target.checked)}
+                                  className="peer h-4 w-4 cursor-pointer appearance-none rounded border border-gray-600 bg-gray-800 transition-all checked:border-blue-500 checked:bg-blue-500"
+                              />
+                              <Check size={10} className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-white opacity-0 peer-checked:opacity-100" />
+                          </div>
+                          <label htmlFor="lyrics-enable-checkbox" className="text-sm font-medium text-white cursor-pointer select-none">
+                              {t.lyrics.enable}
+                          </label>
+                      </div>
+
+                      <div className="flex items-center gap-4 mt-4 flex-wrap">
+                          <label className="text-xs text-gray-300 flex items-center gap-2 cursor-pointer">
+                              <input type="checkbox" checked={config.lyricsBlurEnabled} onChange={(e) => handleChange('lyricsBlurEnabled', e.target.checked)} className="rounded border-gray-600 bg-gray-800 text-blue-500 focus:ring-blue-500" />
+                              {t.lyrics.blurEnabled}
+                          </label>
+                          <label className="text-xs text-gray-300 flex items-center gap-2 cursor-pointer">
+                              <input type="checkbox" checked={config.lyricsBgBlurEnabled} onChange={(e) => handleChange('lyricsBgBlurEnabled', e.target.checked)} className="rounded border-gray-600 bg-gray-800 text-blue-500 focus:ring-blue-500" />
+                              {t.lyrics.bgBlurEnabled}
+                          </label>
+                      </div>
+                  </ControlGroup>
+
+                  <ControlGroup label={t.lyrics.arcEnabled}>
+                      <div className="flex items-center justify-between gap-4">
+                          <label className="text-xs text-gray-300 flex items-center gap-2 cursor-pointer">
+                              <input type="checkbox" checked={config.lyricsArcEnabled} onChange={(e) => handleChange('lyricsArcEnabled', e.target.checked)} className="rounded border-gray-600 bg-gray-800 text-blue-500 focus:ring-blue-500" />
+                              {t.lyrics.arcEnabled}
+                          </label>
+                          {config.lyricsArcEnabled && (
+                              <CustomSelect 
+                                  label=""
+                                  value={config.lyricsArcDirection}
+                                  options={[
+                                      { value: 'left', label: 'Left' },
+                                      { value: 'right', label: 'Right' }
+                                  ]}
+                                  onChange={(v) => handleChange('lyricsArcDirection', v as any)}
+                              />
+                          )}
+                      </div>
+                      <Range label={t.lyrics.positionX} value={config.lyricsPositionX} min={-100} max={100} step={1} onChange={(v) => handleChange('lyricsPositionX', v)} />
+                      <Range label={t.lyrics.positionY} value={config.lyricsPositionY} min={-100} max={100} step={1} onChange={(v) => handleChange('lyricsPositionY', v)} />
+                  </ControlGroup>
+
+                  <ControlGroup label={t.lyrics.fontFamily}>
+                      <CustomSelect 
+                          label={t.lyrics.fontFamily}
+                          value={config.lyricsFontFamily}
+                          options={[
+                              { value: 'sans-serif', label: 'Sans-serif' },
+                              { value: 'serif', label: 'Serif' },
+                              { value: 'monospace', label: 'Monospace' },
+                              { value: '"Microsoft JhengHei", sans-serif', label: '微軟正黑體' },
+                              { value: '"Noto Sans TC", sans-serif', label: 'Noto Sans TC' },
+                              { value: 'Inter, sans-serif', label: 'Inter' }
+                          ]}
+                          onChange={(v) => handleChange('lyricsFontFamily', v)}
+                      />
+                      <Range label={t.lyrics.fontSize} value={config.lyricsFontSize} min={12} max={120} onChange={(v) => handleChange('lyricsFontSize', v)} />
+                      <CustomSelect 
+                          label={t.lyrics.fontStyle}
+                          value={`${config.lyricsFontWeight}-${config.lyricsFontStyle}`}
+                          options={[
+                              { value: 'normal-normal', label: 'Normal' },
+                              { value: 'bold-normal', label: 'Bold' },
+                              { value: 'normal-italic', label: 'Italic' },
+                              { value: 'bold-italic', label: 'Bold Italic' }
+                          ]}
+                          onChange={(v) => {
+                              const [w, s] = v.split('-');
+                              handleChange('lyricsFontWeight', w as any);
+                              handleChange('lyricsFontStyle', s as any);
+                          }}
+                      />
+                      <Range label={t.lyrics.letterSpacing} value={config.lyricsLetterSpacing} min={-5} max={20} step={0.5} onChange={(v) => handleChange('lyricsLetterSpacing', v)} />
+                      <div className="space-y-2">
+                          <label className="text-xs text-gray-300 font-medium">{t.lyrics.color}</label>
+                          <input type="color" value={config.lyricsColor} onChange={(e) => handleChange('lyricsColor', e.target.value)} className="w-full h-8 rounded cursor-pointer bg-transparent" />
+                      </div>
+                      <Range label={t.lyrics.opacity} value={config.lyricsOpacity} min={0} max={1} step={0.05} onChange={(v) => handleChange('lyricsOpacity', v)} />
+                  </ControlGroup>
+
+                  <ControlGroup label={t.lyrics.strokeColor}>
+                      <div className="flex items-center gap-2 mb-2">
+                          <label className="text-xs text-gray-300 flex items-center gap-2 cursor-pointer">
+                              <input type="checkbox" checked={config.lyricsStrokeEnabled} onChange={(e) => handleChange('lyricsStrokeEnabled', e.target.checked)} className="rounded border-gray-600 bg-gray-800 text-blue-500 focus:ring-blue-500" />
+                              {t.lyrics.strokeEnabled}
+                          </label>
+                      </div>
+                      <div className="space-y-2 opacity-100 transition-opacity" style={{ opacity: config.lyricsStrokeEnabled ? 1 : 0.5, pointerEvents: config.lyricsStrokeEnabled ? 'auto' : 'none' }}>
+                          <label className="text-xs text-gray-300 font-medium">{t.lyrics.strokeColor}</label>
+                          <input type="color" value={config.lyricsStrokeColor} onChange={(e) => handleChange('lyricsStrokeColor', e.target.value)} className="w-full h-8 rounded cursor-pointer bg-transparent" />
+                          <Range label={t.lyrics.strokeWidth} value={config.lyricsStrokeWidth} min={0} max={10} step={0.5} onChange={(v) => handleChange('lyricsStrokeWidth', v)} />
+                      </div>
+                  </ControlGroup>
+
+                  <ControlGroup label={t.lyrics.glowColor}>
+                      <div className="flex items-center gap-2 mb-2">
+                          <label className="text-xs text-gray-300 flex items-center gap-2 cursor-pointer">
+                              <input type="checkbox" checked={config.lyricsGlowEnabled} onChange={(e) => handleChange('lyricsGlowEnabled', e.target.checked)} className="rounded border-gray-600 bg-gray-800 text-blue-500 focus:ring-blue-500" />
+                              {t.lyrics.glowEnabled}
+                          </label>
+                      </div>
+                      <div className="space-y-2 transition-opacity" style={{ opacity: config.lyricsGlowEnabled ? 1 : 0.5, pointerEvents: config.lyricsGlowEnabled ? 'auto' : 'none' }}>
+                          <label className="text-xs text-gray-300 font-medium">{t.lyrics.glowColor}</label>
+                          <input type="color" value={config.lyricsGlowColor} onChange={(e) => handleChange('lyricsGlowColor', e.target.value)} className="w-full h-8 rounded cursor-pointer bg-transparent" />
+                          <Range label={t.lyrics.glowRadius} value={config.lyricsGlowRadius} min={0} max={50} onChange={(v) => handleChange('lyricsGlowRadius', v)} />
+                          <Range label={t.lyrics.glowBrightness} value={config.lyricsGlowBrightness} min={0} max={2} step={0.1} onChange={(v) => handleChange('lyricsGlowBrightness', v)} />
+                      </div>
+                  </ControlGroup>
+
+                  <ControlGroup label={t.lyrics.bgColor}>
+                      <div className="flex items-center gap-2 mb-2">
+                          <label className="text-xs text-gray-300 flex items-center gap-2 cursor-pointer">
+                              <input type="checkbox" checked={config.lyricsBgEnabled} onChange={(e) => handleChange('lyricsBgEnabled', e.target.checked)} className="rounded border-gray-600 bg-gray-800 text-blue-500 focus:ring-blue-500" />
+                              {t.lyrics.bgEnabled}
+                          </label>
+                      </div>
+                      <div className="space-y-2 transition-opacity" style={{ opacity: config.lyricsBgEnabled ? 1 : 0.5, pointerEvents: config.lyricsBgEnabled ? 'auto' : 'none' }}>
+                          <label className="text-xs text-gray-300 font-medium">{t.lyrics.bgColor}</label>
+                          <input type="color" value={config.lyricsBgColor} onChange={(e) => handleChange('lyricsBgColor', e.target.value)} className="w-full h-8 rounded cursor-pointer bg-transparent" />
+                          <Range label={t.lyrics.bgRadius} value={config.lyricsBgRadius} min={0} max={50} onChange={(v) => handleChange('lyricsBgRadius', v)} />
+                          <Range label={t.lyrics.bgPadding} value={config.lyricsBgPadding} min={0} max={100} onChange={(v) => handleChange('lyricsBgPadding', v)} />
+                      </div>
+                  </ControlGroup>
+
+                  <ControlGroup label={t.lyrics.animEnter}>
+                      <CustomSelect 
+                          label={t.lyrics.animEnter}
+                          value={config.lyricsAnimEnter}
+                          options={[
+                              { value: 'fade', label: 'Fade In' },
+                              { value: 'typewriter', label: 'Typewriter' },
+                              { value: 'wipeRight', label: 'Wipe Right' },
+                              { value: 'blurIn', label: 'Blur In' },
+                              { value: 'scaleIn', label: 'Scale In' },
+                              { value: 'glitch', label: 'Glitch' }
+                          ]}
+                          onChange={(v) => handleChange('lyricsAnimEnter', v as any)}
+                      />
+                      <CustomSelect 
+                          label={t.lyrics.animLoop}
+                          value={config.lyricsAnimLoop}
+                          options={[
+                              { value: 'none', label: 'None' },
+                              { value: 'wave', label: 'Wave' },
+                              { value: 'bounce', label: 'Bounce' },
+                              { value: 'blink', label: 'Blink' }
+                          ]}
+                          onChange={(v) => handleChange('lyricsAnimLoop', v as any)}
+                      />
+                  </ControlGroup>
+              </div>
             )}
 
           </div>
