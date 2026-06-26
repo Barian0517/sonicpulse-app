@@ -3,7 +3,6 @@ import React, { useState, useRef, useEffect } from 'react';
 import Visualizer from './components/Visualizer';
 import Controls from './components/Controls';
 import Player from './components/Player';
-import { ThreeParticleVisualizer } from './components/Visualizer/ThreeParticleVisualizer';
 import ParticleOverlay from './components/ParticleOverlay';
 import { LyricsOverlay } from './components/LyricsOverlay';
 import { MusicPlayerLayout } from './components/MusicPlayer/MusicPlayerLayout';
@@ -1014,16 +1013,8 @@ const App: React.FC = () => {
       <audio ref={audio1Ref} className="hidden" crossOrigin="anonymous" />
       <audio ref={audio2Ref} className="hidden" crossOrigin="anonymous" />
 
-      {/* Atmospheric Particles Overlay (WebGL) */}
-      {config.particleEffect === VisualizerParticleEffect.Space && (
-        <ThreeParticleVisualizer 
-          config={config} 
-          analyser={analyserRef.current} 
-        />
-      )}
-
       {/* Atmospheric Particles Overlay (2D Canvas) */}
-      {config.particleEffect !== VisualizerParticleEffect.None && config.particleEffect !== VisualizerParticleEffect.Space && (
+      {config.particleEffect !== VisualizerParticleEffect.None && (
         <div className="absolute top-0 left-0 w-full h-full pointer-events-none z-10">
           <ParticleOverlay 
             effect={config.particleEffect} 

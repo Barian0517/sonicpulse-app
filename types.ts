@@ -29,7 +29,6 @@ export enum VisualizerParticleEffect {
   Snow = 'Snow',
   Rain = 'Rain',
   Sakura = 'Sakura',
-  Space = 'Space (3D)',
 }
 
 export enum SymmetryMode {
