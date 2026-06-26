@@ -1,5 +1,5 @@
 
-import React, { useRef, useEffect, useImperativeHandle, forwardRef } from 'react';
+import React, { useRef, useEffect, useImperativeHandle, forwardRef, useState } from 'react';
 import { VisualizerConfig, VisualizerShape, VisualizerDirection, VisualizerStyle, SymmetryMode, VisualizerMaterial } from '../types';
 import { ThreeVisualizer } from './ThreeGrid/ThreeVisualizer';
 import { PresetVisualizer } from './Visualizer/PresetVisualizer';
@@ -31,7 +31,7 @@ const Visualizer = forwardRef<HTMLCanvasElement, VisualizerProps>(({ analyser, c
   // Overlay state
   const overlayDataRef = useRef<{data: number[], bassAvg: number} | null>(null);
   const overlayConfigRef = useRef<VisualizerConfig>(config);
-  const overlayCoverRef = useRef<string | null>(null);
+  const [overlayCoverUrl, setOverlayCoverUrl] = useState<string | null>(null);
 
   useEffect(() => {
     channelRef.current = new BroadcastChannel('sonicpulse_sync');
@@ -40,7 +40,9 @@ const Visualizer = forwardRef<HTMLCanvasElement, VisualizerProps>(({ analyser, c
            if (e.data.type === 'sync') {
                overlayDataRef.current = { data: e.data.data, bassAvg: e.data.bassAvg };
                overlayConfigRef.current = e.data.config;
-               overlayCoverRef.current = e.data.albumCoverUrl;
+               if (e.data.albumCoverUrl !== overlayCoverUrl) {
+                   setOverlayCoverUrl(e.data.albumCoverUrl);
+               }
            }
        };
     }
@@ -278,7 +280,7 @@ const Visualizer = forwardRef<HTMLCanvasElement, VisualizerProps>(({ analyser, c
     }
 
     // 3D RENDERING OVERLAYS
-    if (config.shape === VisualizerShape.Grid3D || config.shape === VisualizerShape.PresetEmily) {
+    if (config.shape === VisualizerShape.Grid3D) {
         return; 
     }
 
@@ -638,13 +640,7 @@ const Visualizer = forwardRef<HTMLCanvasElement, VisualizerProps>(({ analyser, c
            <ThreeVisualizer analyser={analyser} config={config} />
         </div>
       )}
-      {[
-         VisualizerShape.PresetEmily
-       ].includes(config.shape) && (
-        <div className="absolute top-0 left-0 w-full h-full z-10">
-           <PresetVisualizer analyser={analyser} config={config} albumCoverUrl={isOverlay ? overlayCoverRef.current : albumCoverUrl} />
-        </div>
-      )}
+
     </>
   );
 });

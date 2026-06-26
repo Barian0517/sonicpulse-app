@@ -4,7 +4,6 @@ export enum VisualizerShape {
   Line = 'Line',
   Sphere = 'Sphere',
   Grid3D = 'Grid3D',
-  PresetEmily = 'PresetEmily',
 }
 
 export enum VisualizerDirection {

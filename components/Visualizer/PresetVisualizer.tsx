@@ -2,7 +2,6 @@ import React, { useRef, useEffect, useState } from 'react';
 import * as THREE from 'three';
 import { VisualizerConfig, VisualizerShape } from '../../types';
 import { BeatDetector } from '../../utils/beatDetector';
-import { EmilyScene } from './Scenes/EmilyScene';
 
 interface PresetVisualizerProps {
     config: VisualizerConfig;
@@ -60,11 +59,8 @@ export const PresetVisualizer: React.FC<PresetVisualizerProps> = ({ config, anal
             dirLight.position.set(0, 100, 100);
             scene.add(dirLight);
 
-            // Instantiate correct scene class
             switch (config.shape) {
-                case VisualizerShape.PresetEmily:
-                    activeSceneInstance.current = new EmilyScene(scene, camera, config, albumCoverUrl);
-                    break;
+                // Future preset shapes can go here
             }
         };
 
