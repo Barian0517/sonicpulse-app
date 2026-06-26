@@ -336,39 +336,46 @@ export class NavidromeProvider implements MusicProvider {
 
     async getLyrics(track: Track): Promise<string | null> {
         try {
-            // First try the modern OpenSubsonic getLyricsBySongId
-            try {
-                const res = await this.fetchApi('getLyricsBySongId', { id: track.id });
+            const searchParams = new URLSearchParams();
+            searchParams.append('u', this.username);
+            searchParams.append('p', this.password);
+            searchParams.append('v', '1.16.1');
+            searchParams.append('c', 'my_script');
+            searchParams.append('f', 'json');
+            searchParams.append('id', track.id);
+            
+            const url = `${this.serverUrl}/rest/getLyricsBySongId?${searchParams.toString()}`;
+            
+            const res = await tauriFetch(url, { method: 'GET' });
+            const json = await res.json();
+            const response = json['subsonic-response'];
+            
+            if (!response || response.status === 'failed') {
+                return null;
+            }
+            
+            const list = response.lyricsList?.structuredLyrics || response.lyricsList?.lyrics;
+            if (list && list.length > 0) {
+                const match = list.find((l: any) => l.synced) || list[0];
                 
-                // OpenSubsonic can return either 'lyrics' or 'structuredLyrics' depending on version/server
-                const list = res.lyricsList?.lyrics || res.lyricsList?.structuredLyrics;
-                
-                if (list && list.length > 0) {
-                    // Find synced lyrics if possible, otherwise use the first one
-                    const match = list.find((l: any) => l.synced) || list[0];
-                    if (match?.value) return match.value;
-                    
-                    // If it returns structured lines instead of a single value string
-                    if (match?.line && Array.isArray(match.line)) {
-                        // Reconstruct LRC from structured lines
-                        return match.line.map((l: any) => {
-                            const totalMs = l.start || 0;
+                if (match?.line && Array.isArray(match.line)) {
+                    return match.line.map((l: any) => {
+                        if (l.start !== undefined && l.start !== null) {
+                            const totalMs = l.start;
                             const min = Math.floor(totalMs / 60000);
                             const sec = Math.floor((totalMs % 60000) / 1000);
                             const ms = Math.floor((totalMs % 1000) / 10);
                             return `[${min.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}.${ms.toString().padStart(2, '0')}]${l.value || ''}`;
-                        }).join('\n');
-                    }
+                        }
+                        return l.value || '';
+                    }).join('\n');
+                } else if (match?.value) {
+                    return match.value;
                 }
-            } catch {
-                // Ignore and fallback to legacy getLyrics
             }
-
-            // Fallback to legacy getLyrics by artist/title
-            if (!track.artist || !track.title) return null;
-            const res = await this.fetchApi('getLyrics', { artist: track.artist, title: track.title });
-            return res.lyrics?.value || null;
-        } catch {
+            return null;
+        } catch (e) {
+            console.error("Navidrome lyric fetch failed:", e);
             return null;
         }
     }
