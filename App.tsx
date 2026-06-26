@@ -4,6 +4,7 @@ import Visualizer from './components/Visualizer';
 import Controls from './components/Controls';
 import Player from './components/Player';
 import { ThreeParticleVisualizer } from './components/Visualizer/ThreeParticleVisualizer';
+import ParticleOverlay from './components/ParticleOverlay';
 import { LyricsOverlay } from './components/LyricsOverlay';
 import { MusicPlayerLayout } from './components/MusicPlayer/MusicPlayerLayout';
 import { VisualizerConfig, VisualizerShape, VisualizerDirection, VisualizerStyle, SymmetryMode, AudioSourceState, VisualizerMaterial, VisualizerParticleEffect } from './types';
@@ -45,7 +46,7 @@ const DEFAULT_CONFIG: VisualizerConfig = {
   bgPositionY: 50,
   bgRotation: 0,
 
-  particleEffect: VisualizerParticleEffect.Sakura,
+  particleEffect: VisualizerParticleEffect.None,
   particleCount: 150,
   particleSpeed: 1,
   particleSize: 1,
@@ -109,30 +110,94 @@ const STORAGE_KEY_OVERLAY_W = 'sonicpulse_overlay_w';
 const STORAGE_KEY_OVERLAY_H = 'sonicpulse_overlay_h';
 
 const App: React.FC = () => {
-  // Load config from local storage or use default
-  const [config, setConfig] = useState<VisualizerConfig>(() => {
+  // Separate storage for each shape
+  const [configsByShape, setConfigsByShape] = useState<Record<string, VisualizerConfig>>(() => {
     try {
-      const saved = localStorage.getItem(STORAGE_KEY_CONFIG);
-      if (saved) {
-        // Merge with default to ensure all keys exist if schema changes
-        const parsed = JSON.parse(saved);
-        // Safety check for dangerous values that might freeze the app
-        if (parsed.barCount > 1000 && parsed.shape === VisualizerShape.Sphere) {
-          parsed.barCount = 1000;
-        }
-
-        // Remove 'blob:' URLs as they are not persistent across reloads
-        if (parsed.backgroundImage && parsed.backgroundImage.startsWith('blob:')) {
-          parsed.backgroundImage = null;
-        }
-
-        return { ...DEFAULT_CONFIG, ...parsed };
+      const savedDictStr = localStorage.getItem('sonicpulse_configs_dict');
+      if (savedDictStr) {
+        return JSON.parse(savedDictStr);
+      }
+      // Migrate from old storage
+      const oldSaved = localStorage.getItem(STORAGE_KEY_CONFIG);
+      if (oldSaved) {
+        const parsed = JSON.parse(oldSaved);
+        const shape = parsed.shape || VisualizerShape.Circle;
+        return { [shape]: { ...DEFAULT_CONFIG, ...parsed } };
       }
     } catch (e) {
-      console.warn("Failed to load saved config:", e);
+      console.warn("Failed to load configs map:", e);
     }
-    return DEFAULT_CONFIG;
+    return {};
   });
+
+  const [config, setConfigInternal] = useState<VisualizerConfig>(() => {
+    try {
+      let activeShape = localStorage.getItem('sonicpulse_active_shape') as VisualizerShape | null;
+      if (!activeShape) {
+         const oldSaved = localStorage.getItem(STORAGE_KEY_CONFIG);
+         if (oldSaved) {
+             const parsed = JSON.parse(oldSaved);
+             activeShape = parsed.shape;
+         }
+      }
+      activeShape = activeShape || VisualizerShape.Circle;
+      
+      const savedDictStr = localStorage.getItem('sonicpulse_configs_dict');
+      if (savedDictStr) {
+          const dict = JSON.parse(savedDictStr);
+          if (dict[activeShape]) {
+              return { ...DEFAULT_CONFIG, ...dict[activeShape], shape: activeShape };
+          }
+      } else {
+         const oldSaved = localStorage.getItem(STORAGE_KEY_CONFIG);
+         if (oldSaved) {
+             const parsed = JSON.parse(oldSaved);
+             return { ...DEFAULT_CONFIG, ...parsed, shape: activeShape };
+         }
+      }
+      return { ...DEFAULT_CONFIG, shape: activeShape };
+    } catch(e) {
+      return DEFAULT_CONFIG;
+    }
+  });
+
+  const setConfig = (newConfigOrUpdater: VisualizerConfig | ((prev: VisualizerConfig) => VisualizerConfig)) => {
+      setConfigInternal(prevConfig => {
+          const newConfig = typeof newConfigOrUpdater === 'function' ? newConfigOrUpdater(prevConfig) : newConfigOrUpdater;
+          
+          if (newConfig.shape !== prevConfig.shape) {
+              // User switched shape! Load the saved config for that new shape
+              const savedForNewShape = configsByShape[newConfig.shape] || { ...DEFAULT_CONFIG, shape: newConfig.shape };
+              localStorage.setItem('sonicpulse_active_shape', newConfig.shape);
+              return savedForNewShape;
+          } else {
+              // User changed a parameter within the same shape
+              setConfigsByShape(prevDict => {
+                  const updatedDict = { ...prevDict, [newConfig.shape]: newConfig };
+                  try {
+                      localStorage.setItem('sonicpulse_configs_dict', JSON.stringify(updatedDict));
+                  } catch (e) {
+                      console.warn("Failed to save configs dict (quota?)");
+                      if (newConfig.backgroundImage) {
+                          const configNoBg = { ...newConfig, backgroundImage: null };
+                          const fallbackDict = { ...prevDict, [newConfig.shape]: configNoBg };
+                          try { localStorage.setItem('sonicpulse_configs_dict', JSON.stringify(fallbackDict)); } catch(e) {}
+                      }
+                  }
+                  return updatedDict;
+              });
+              try {
+                  localStorage.setItem(STORAGE_KEY_CONFIG, JSON.stringify(newConfig));
+              } catch (e) {
+                  if (newConfig.backgroundImage) {
+                      const configNoBg = { ...newConfig, backgroundImage: null };
+                      try { localStorage.setItem(STORAGE_KEY_CONFIG, JSON.stringify(configNoBg)); } catch(e) {}
+                  }
+              }
+              return newConfig;
+          }
+      });
+  };
 
   const [audioState, setAudioState] = useState<AudioSourceState>({
     isPlaying: false,
@@ -199,23 +264,7 @@ const App: React.FC = () => {
 
   const t = translations[language];
 
-  // Persist config changes
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY_CONFIG, JSON.stringify(config));
-    } catch (e) {
-      console.warn("Failed to save config to local storage (quota exceeded?)", e);
-      // Fallback: Try saving without the heavy background image
-      if (config.backgroundImage) {
-        const configNoBg = { ...config, backgroundImage: null };
-        try {
-          localStorage.setItem(STORAGE_KEY_CONFIG, JSON.stringify(configNoBg));
-        } catch (retryErr) {
-          console.error("Critical failure saving config", retryErr);
-        }
-      }
-    }
-  }, [config]);
+
 
   // Persist language changes
   useEffect(() => {
@@ -966,10 +1015,24 @@ const App: React.FC = () => {
       <audio ref={audio2Ref} className="hidden" crossOrigin="anonymous" />
 
       {/* Atmospheric Particles Overlay (WebGL) */}
-      <ThreeParticleVisualizer 
-        config={config} 
-        analyser={analyserRef.current} 
-      />
+      {config.particleEffect === VisualizerParticleEffect.Space && (
+        <ThreeParticleVisualizer 
+          config={config} 
+          analyser={analyserRef.current} 
+        />
+      )}
+
+      {/* Atmospheric Particles Overlay (2D Canvas) */}
+      {config.particleEffect !== VisualizerParticleEffect.None && config.particleEffect !== VisualizerParticleEffect.Space && (
+        <div className="absolute top-0 left-0 w-full h-full pointer-events-none z-10">
+          <ParticleOverlay 
+            effect={config.particleEffect} 
+            count={config.particleCount} 
+            speed={config.particleSpeed} 
+            size={config.particleSize} 
+          />
+        </div>
+      )}
 
       <div className="absolute top-4 left-4 z-40 flex items-center gap-3">
         <button

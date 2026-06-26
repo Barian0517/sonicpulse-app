@@ -146,7 +146,8 @@ export const translations = {
       None: "None",
       Snow: "Snow",
       Rain: "Rain",
-      Sakura: "Sakura (Cherry Blossom)"
+      Sakura: "Sakura",
+      "Space (3D)": "Space (3D)"
     },
     overlay: "Select Audio Source to Begin"
   },
@@ -294,7 +295,8 @@ export const translations = {
       None: "無",
       Snow: "下雪",
       Rain: "下雨",
-      Sakura: "櫻花飄落"
+      Sakura: "落櫻",
+      "Space (3D)": "星空 (3D)"
     },
     overlay: "請選擇音訊來源以開始"
   },
@@ -442,7 +444,8 @@ export const translations = {
       None: "なし",
       Snow: "雪",
       Rain: "雨",
-      Sakura: "桜 (サクラ)"
+      Sakura: "桜",
+      "Space (3D)": "宇宙 (3D)"
     },
     overlay: "開始するにはオーディオソースを選択してください"
   }

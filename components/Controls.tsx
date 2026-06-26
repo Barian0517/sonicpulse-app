@@ -495,7 +495,9 @@ const Controls: React.FC<ControlsProps> = ({
                     </ControlGroup>
 
                     <ControlGroup label={t.layout.dimensions}>
-                        <Range label={t.layout.size} value={config.radius} min={10} max={500} onChange={(v) => handleChange('radius', v)} />
+                        {config.shape !== VisualizerShape.Line && (
+                            <Range label={t.layout.size} value={config.radius} min={10} max={500} onChange={(v) => handleChange('radius', v)} />
+                        )}
                         <Range label={t.layout.count} value={config.barCount} min={16} max={512} step={1} onChange={(v) => handleChange('barCount', v)} />
                         <Range label={t.layout.width} value={config.barWidth} min={1} max={50} onChange={(v) => handleChange('barWidth', v)} />
                         {config.shape === VisualizerShape.Line && (
