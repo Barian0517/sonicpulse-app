@@ -197,7 +197,7 @@ export const TrackList: React.FC<{
             {menuTrackId && (
                 <div 
                     className="fixed z-50 bg-[#151520] border border-white/10 rounded-xl shadow-2xl py-2 min-w-[180px] backdrop-blur-xl text-sm"
-                    style={{ left: Math.min(menuPosition.x, window.innerWidth - 200), top: Math.min(menuPosition.y, window.innerHeight - 300) }}
+                    style={{ left: Math.max(10, menuPosition.x - 220), top: Math.min(menuPosition.y, window.innerHeight - 300) }}
                     onClick={e => e.stopPropagation()}
                 >
                     {!showPlaylists ? (

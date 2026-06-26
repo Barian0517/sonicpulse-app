@@ -1015,7 +1015,7 @@ const App: React.FC = () => {
 
       {/* Atmospheric Particles Overlay (2D Canvas) */}
       {config.particleEffect !== VisualizerParticleEffect.None && (
-        <div className="absolute top-0 left-0 w-full h-full pointer-events-none z-10">
+        <div className="absolute top-0 left-0 w-full h-full pointer-events-none z-20">
           <ParticleOverlay 
             effect={config.particleEffect} 
             count={config.particleCount} 
