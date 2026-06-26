@@ -1,12 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Play, Shuffle, Plus, ListPlus, Loader2 } from 'lucide-react';
-import { NavidromeProvider } from '../../providers/NavidromeProvider';
-import { Track, Playlist } from '../../providers/MusicProvider';
+import { MusicProvider, Track, Playlist } from '../../providers/MusicProvider';
 import { TrackList } from './TrackList';
 
 export const PlaylistDetailsView: React.FC<{
     playlist: Playlist;
-    provider: NavidromeProvider;
+    provider: MusicProvider;
     onBack: () => void;
     onPlayTrack: (track: Track) => void;
     onPlayNow?: (tracks: Track[], startIndex?: number) => void;

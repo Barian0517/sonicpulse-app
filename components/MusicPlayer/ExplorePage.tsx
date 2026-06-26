@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { NavidromeProvider } from '../../providers/NavidromeProvider';
-import { Track } from '../../providers/MusicProvider';
+import { MusicProvider, Track } from '../../providers/MusicProvider';
 import { TrackList } from './TrackList';
 
 export const ExplorePage: React.FC<{
-    provider: NavidromeProvider;
+    provider: MusicProvider;
     onPlayTrack: (track: Track) => void;
     onPlayNow?: (tracks: Track[], startIndex?: number) => void;
     onPlayNext?: (tracks: Track[]) => void;

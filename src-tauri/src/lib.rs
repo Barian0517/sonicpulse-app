@@ -31,6 +31,19 @@ async fn download_file(url: String, album_name: Option<String>, file_name: Strin
     Ok(path.to_string_lossy().to_string())
 }
 
+#[tauri::command]
+async fn get_webview_cookies(app_handle: tauri::AppHandle, window_label: String) -> Result<Vec<String>, String> {
+    use tauri::Manager;
+    let window = app_handle.get_webview_window(&window_label).ok_or("Window not found")?;
+    let cookies = window.cookies().map_err(|e| e.to_string())?;
+    
+    let mut cookie_strings = Vec::new();
+    for cookie in cookies {
+        cookie_strings.push(format!("{}={}", cookie.name(), cookie.value()));
+    }
+    Ok(cookie_strings)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
   tauri::Builder::default()
@@ -50,7 +63,8 @@ pub fn run() {
         audio::scan_local_music,
         audio::get_cover_art,
         audio::read_lrc_file,
-        download_file
+        download_file,
+        get_webview_cookies
     ])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");

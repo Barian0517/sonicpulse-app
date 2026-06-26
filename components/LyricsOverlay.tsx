@@ -4,6 +4,7 @@ import { Track } from '../providers/MusicProvider';
 import { parseLrc, LyricLine as ParsedLyricLine } from '../utils/lyricsParser';
 import { NavidromeProvider } from '../providers/NavidromeProvider';
 import { LocalProvider } from '../providers/LocalProvider';
+import { NeteaseProvider } from '../providers/NeteaseProvider';
 import { fetch as tauriFetch } from '@tauri-apps/plugin-http';
 import { LyricLine } from './LyricLine';
 
@@ -20,6 +21,7 @@ export const LyricsOverlay: React.FC<LyricsOverlayProps> = ({ track, currentTime
     // Providers for fetching lyrics
     const naviProvider = useMemo(() => new NavidromeProvider(), []);
     const localProvider = useMemo(() => new LocalProvider(), []);
+    const neteaseProvider = useMemo(() => new NeteaseProvider(), []);
 
     useEffect(() => {
         if (!track) {
@@ -36,6 +38,12 @@ export const LyricsOverlay: React.FC<LyricsOverlayProps> = ({ track, currentTime
                 lrcText = await naviProvider.getLyrics(track);
             } else if (track.source === 'local') {
                 lrcText = await localProvider.getLyrics(track);
+            } else if (track.source === 'netease') {
+                try {
+                    lrcText = await neteaseProvider.getLyrics(track);
+                } catch (e) {
+                    console.error("Failed to fetch exact Netease lyrics:", e);
+                }
             }
             
             // LRCLIB Fallback

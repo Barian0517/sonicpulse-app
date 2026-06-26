@@ -1,12 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Music2, Play, Heart, DownloadCloud, CheckCircle2, Star, MoreHorizontal, Plus } from 'lucide-react';
-import { Track, Playlist } from '../../providers/MusicProvider';
-import { NavidromeProvider } from '../../providers/NavidromeProvider';
+import { MusicProvider, Track, Playlist } from '../../providers/MusicProvider';
 import { offlineManager } from '../../providers/OfflineManager';
 
 export const TrackList: React.FC<{
     tracks: Track[];
-    provider: NavidromeProvider;
+    provider: MusicProvider;
     onPlayTrack: (track: Track) => void;
     onPlayNow?: (tracks: Track[], startIndex?: number) => void;
     onPlayNext?: (tracks: Track[]) => void;

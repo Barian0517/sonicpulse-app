@@ -4,8 +4,10 @@ import { open } from '@tauri-apps/plugin-dialog';
 import { convertFileSrc } from '@tauri-apps/api/core';
 import { LocalProvider } from '../../providers/LocalProvider';
 import { NavidromeProvider } from '../../providers/NavidromeProvider';
+import { NeteaseProvider } from '../../providers/NeteaseProvider';
 import { Track, Album } from '../../providers/MusicProvider';
 import { NavidromeView } from './NavidromeView';
+import { NeteaseView } from './NeteaseView';
 
 export const MusicPlayerLayout: React.FC<{ 
     isOpen: boolean; 
@@ -19,9 +21,10 @@ export const MusicPlayerLayout: React.FC<{
     isLyricsEnabled?: boolean;
     onToggleLyrics?: () => void;
 }> = ({ isOpen, onClose, playbackState, onTogglePlay, onSeek, onVolumeChange, onPlay, onQueueUpdate, isLyricsEnabled, onToggleLyrics }) => {
-    const [activeSource, setActiveSource] = useState<'local' | 'navidrome' | 'settings'>('local');
+    const [activeSource, setActiveSource] = useState<'local' | 'navidrome' | 'netease' | 'settings'>('local');
     const [localProvider] = useState(() => new LocalProvider());
     const [naviProvider] = useState(() => new NavidromeProvider());
+    const [neteaseProvider] = useState(() => new NeteaseProvider());
     
     // Search & Filter State
     const [searchQuery, setSearchQuery] = useState('');
@@ -42,12 +45,16 @@ export const MusicPlayerLayout: React.FC<{
     const [queueIndex, setQueueIndex] = useState(-1);
 
     // Navidrome Settings State
-    const [naviUrl, setNaviUrl] = useState('');
-    const [naviUser, setNaviUser] = useState('');
-    const [naviPass, setNaviPass] = useState('');
+    const [naviUrl, setNaviUrl] = useState(localStorage.getItem('navidrome_url') || '');
+    const [naviUser, setNaviUser] = useState(localStorage.getItem('navidrome_user') || '');
+    const [naviPass, setNaviPass] = useState(localStorage.getItem('navidrome_pass') || '');
+    const [isNaviReady, setIsNaviReady] = useState(false);
+
+    // Netease Settings State
+    const [neteaseUrl, setNeteaseUrl] = useState(localStorage.getItem('netease_server_url') || 'https://netease-cloud-music-api-v3.vercel.app');
+    const [isNeteaseReady, setIsNeteaseReady] = useState(!!localStorage.getItem('netease_server_url'));
 
     useEffect(() => {
-        // Auto-load saved credentials and folder
         const loadSaved = async () => {
             const savedFolder = localStorage.getItem('local_music_folder');
             if (savedFolder) {
@@ -88,7 +95,6 @@ export const MusicPlayerLayout: React.FC<{
     const { isPlaying, progress, volume } = playbackState;
 
     const [isLocalReady, setIsLocalReady] = useState(false);
-    const [isNaviReady, setIsNaviReady] = useState(false);
 
     const handleSelectLocalFolder = async () => {
         try {
@@ -105,6 +111,20 @@ export const MusicPlayerLayout: React.FC<{
         } catch (e: any) {
             console.error(e);
             alert("Failed to load folder: " + (e.message || String(e)));
+        }
+    };
+
+    const handleConnectNetease = async () => {
+        try {
+            const url = new URL(neteaseUrl);
+            localStorage.setItem('netease_server_url', url.toString());
+            // Force re-create provider or update its URL internally. For now, reload to apply since it's read in constructor.
+            // Better: update the provider's serverUrl directly, but we can't access private fields.
+            // So we just set local storage and reload window.
+            window.location.reload();
+        } catch (e: any) {
+            console.error(e);
+            alert("Invalid Netease Server URL");
         }
     };
 
@@ -162,16 +182,24 @@ export const MusicPlayerLayout: React.FC<{
         setCurrentTrack(track);
         let url = track.streamUrl || '';
         
-        if (track.source === 'local') {
-            url = convertFileSrc(url);
-        } else if (track.source === 'navidrome') {
-            url = await naviProvider.getStreamUrl(track.id);
+        try {
+            if (track.source === 'local') {
+                url = convertFileSrc(url);
+            } else if (track.source === 'navidrome') {
+                url = await naviProvider.getStreamUrl(track.id);
+            } else if (track.source === 'netease') {
+                url = await neteaseProvider.getStreamUrl(track.id);
+            }
+        } catch (e: any) {
+            console.error("Failed to get stream URL:", e);
+            alert(`無法取得這首歌曲的播放連結: ${e.message}`);
+            return;
         }
 
         onPlay(url, `${track.title} ${track.artist ? `by ${track.artist}` : ''}`, track.coverUrl, track);
         
         if (!track.coverUrl) {
-            const provider = track.source === 'local' ? localProvider : naviProvider;
+            const provider = track.source === 'local' ? localProvider : (track.source === 'netease' ? neteaseProvider : naviProvider);
             const cover = await provider.getCoverArt(track.id);
             if (cover) {
                 setCurrentTrack(prev => prev?.id === track.id ? { ...prev, coverUrl: cover } : prev);
@@ -311,8 +339,16 @@ export const MusicPlayerLayout: React.FC<{
                          onClick={() => setActiveSource('navidrome')}
                         className={`w-14 h-14 rounded-2xl flex flex-col items-center justify-center gap-1 transition-all duration-300 ${activeSource === 'navidrome' ? 'bg-purple-500/20 text-purple-300 shadow-[0_0_20px_rgba(168,85,247,0.3)] border border-purple-500/30' : 'text-gray-500 hover:text-gray-300 hover:bg-white/5 hover:border hover:border-white/10'}`}
                     >
+                        <Server size={20} />
+                        <span className="text-[10px] font-medium">Navidrome</span>
+                    </button>
+                    
+                    <button 
+                         onClick={() => setActiveSource('netease')}
+                        className={`w-14 h-14 rounded-2xl flex flex-col items-center justify-center gap-1 transition-all duration-300 ${activeSource === 'netease' ? 'bg-red-500/20 text-red-400 shadow-[0_0_20px_rgba(239,68,68,0.3)] border border-red-500/30' : 'text-gray-500 hover:text-gray-300 hover:bg-white/5 hover:border hover:border-white/10'}`}
+                    >
                         <Disc size={20} />
-                        <span className="text-[10px] font-medium">Server</span>
+                        <span className="text-[10px] font-medium">網易雲</span>
                     </button>
                 </div>
 
@@ -397,6 +433,32 @@ export const MusicPlayerLayout: React.FC<{
                         <div className="w-full h-full pb-24">
                             <NavidromeView 
                                 provider={naviProvider} 
+                                onPlayTrack={playTrack}
+                                onPlayNow={playNow}
+                                onPlayNext={playNext}
+                                onAddToQueue={addToQueue}
+                                currentTrackId={currentTrack?.id} 
+                                isPlaying={isPlaying} 
+                            />
+                        </div>
+                    )}
+
+                    {activeSource === 'netease' && !isNeteaseReady && (
+                        <div className="flex flex-col items-center justify-center w-full h-full gap-4 max-w-sm mx-auto">
+                            <Disc size={48} className="text-red-500 mb-2" />
+                            <h2 className="text-xl font-bold">Connect to Netease API</h2>
+                            <p className="text-sm text-gray-400 text-center mb-2">Provide a NeteaseCloudMusicApi URL</p>
+                            <input type="text" placeholder="Server URL (e.g. https://netease...vercel.app)" value={neteaseUrl} onChange={e => setNeteaseUrl(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-sm" />
+                            <button onClick={handleConnectNetease} className="w-full mt-2 bg-red-600 hover:bg-red-500 px-6 py-2.5 rounded-lg font-bold text-sm shadow-[0_0_20px_rgba(239,68,68,0.3)] transition-all">
+                                Connect
+                            </button>
+                        </div>
+                    )}
+
+                    {activeSource === 'netease' && isNeteaseReady && (
+                        <div className="w-full h-full pb-24">
+                            <NeteaseView 
+                                provider={neteaseProvider} 
                                 onPlayTrack={playTrack}
                                 onPlayNow={playNow}
                                 onPlayNext={playNext}

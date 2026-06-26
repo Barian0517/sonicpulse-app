@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, PlayCircle, Loader2, Mic2 } from 'lucide-react';
-import { NavidromeProvider } from '../../providers/NavidromeProvider';
-import { Artist, Album } from '../../providers/MusicProvider';
+import { MusicProvider, Album, Artist } from '../../providers/MusicProvider';
 
 export const ArtistDetailsView: React.FC<{
     artist: Artist;
-    provider: NavidromeProvider;
+    provider: MusicProvider;
     onBack: () => void;
     onAlbumClick: (album: Album) => void;
 }> = ({ artist, provider, onBack, onAlbumClick }) => {
