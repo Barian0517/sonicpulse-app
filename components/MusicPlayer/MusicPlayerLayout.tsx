@@ -230,11 +230,31 @@ export const MusicPlayerLayout: React.FC<{
         }
     };
 
+    const playInsertNextAndPlay = (tracksToInsert: Track[], targetPlayIndex: number = 0) => {
+        if (tracksToInsert.length === 0) return;
+        if (queue.length === 0) {
+            setQueue(tracksToInsert);
+            setQueueIndex(targetPlayIndex);
+            playTrackUrl(tracksToInsert[targetPlayIndex]);
+            return;
+        }
+        
+        // Find the index to insert at
+        const insertAt = queueIndex >= 0 ? queueIndex + 1 : queue.length;
+        
+        setQueue(prev => {
+            const newQueue = [...prev];
+            newQueue.splice(insertAt, 0, ...tracksToInsert);
+            return newQueue;
+        });
+        
+        const newQueueIndex = insertAt + targetPlayIndex;
+        setQueueIndex(newQueueIndex);
+        playTrackUrl(tracksToInsert[targetPlayIndex]);
+    };
+
     const playNow = (tracksToPlay: Track[], startIndex: number = 0) => {
-        if (tracksToPlay.length === 0) return;
-        setQueue(tracksToPlay);
-        setQueueIndex(startIndex);
-        playTrackUrl(tracksToPlay[startIndex]);
+        playInsertNextAndPlay(tracksToPlay, startIndex);
     };
 
     const playNext = (tracksToInsert: Track[]) => {
