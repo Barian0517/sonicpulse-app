@@ -44,8 +44,27 @@ const Player: React.FC<PlayerProps> = ({
   const [isMinimized, setIsMinimized] = useState(false);
   const [showPlaylist, setShowPlaylist] = useState(false);
   const progressBarRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const [localSeek, setLocalSeek] = useState<number | null>(null);
   const lastVolumeRef = useRef<number>(0.5);
+
+  // Reset showPlaylist when minimized
+  useEffect(() => {
+    if (isMinimized) {
+      setShowPlaylist(false);
+    }
+  }, [isMinimized]);
+
+  // Click outside to minimize
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (!isMinimized && containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setIsMinimized(true);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isMinimized]);
 
   // Update last volume when volume changes (if not muted)
   useEffect(() => {
@@ -102,6 +121,7 @@ const Player: React.FC<PlayerProps> = ({
   if (isMinimized) {
     return (
       <div 
+        onMouseDown={(e) => e.stopPropagation()}
         onClick={() => setIsMinimized(false)}
         className="absolute bottom-8 left-1/2 -translate-x-1/2 z-40 cursor-pointer animate-[fadeIn_0.3s_ease-out]"
       >
@@ -130,6 +150,7 @@ const Player: React.FC<PlayerProps> = ({
   // Expanded View
   return (
     <div 
+      ref={containerRef}
       className="absolute bottom-8 left-1/2 -translate-x-1/2 w-full max-w-lg z-40 transition-all duration-500 ease-out transform animate-[slideInUp_0.3s_ease-out]"
       onMouseEnter={() => setIsHovering(true)}
       onMouseLeave={() => setIsHovering(false)}

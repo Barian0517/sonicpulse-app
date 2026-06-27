@@ -33,6 +33,28 @@ export const MusicPlayerLayout: React.FC<{
     // Timeline Seek State
     const [localSeek, setLocalSeek] = useState<number | null>(null);
     const timelineRef = useRef<HTMLDivElement>(null);
+    const containerRef = useRef<HTMLDivElement>(null);
+
+    // Reset state when closed
+    useEffect(() => {
+        if (!isOpen) {
+            setActiveSource('local');
+        }
+    }, [isOpen]);
+
+    // Click outside to close
+    useEffect(() => {
+        const handleClickOutside = (e: MouseEvent) => {
+            if (isOpen && containerRef.current && !containerRef.current.contains(e.target as Node)) {
+                // Ensure we don't close if they clicked the toggle button in App.tsx (we assume that's handled, but clicking the button will fire outside anyway)
+                // Actually, the open button stops propagation or we just close it and let it open again.
+                // It's safer to use a custom event or check if the click is on the Music icon, but standard practice is just onClose.
+                onClose();
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [isOpen, onClose]);
 
     const [tracks, setTracks] = useState<Track[]>([]);
     const [albums, setAlbums] = useState<Album[]>([]);
@@ -320,6 +342,7 @@ export const MusicPlayerLayout: React.FC<{
 
     return (
         <div 
+            ref={containerRef}
             className={`fixed inset-y-0 left-0 w-[1000px] max-w-[90vw] text-white flex z-50 transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] ${
                 isOpen ? 'translate-x-0 shadow-[30px_0_80px_rgba(0,0,0,0.8)]' : '-translate-x-full shadow-none pointer-events-none'
             }`}

@@ -59,6 +59,8 @@ const Controls: React.FC<ControlsProps> = ({
   hasOverlay
 }) => {
   const [isOpen, setIsOpen] = useState(true);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const toggleBtnRef = useRef<HTMLButtonElement>(null);
   const [activeTab, setActiveTab] = useState<'audio' | 'style' | 'layout' | 'effects' | 'lyrics'>('audio');
   const [prevTab, setPrevTab] = useState<'audio' | 'style' | 'layout' | 'effects' | 'lyrics'>('audio');
   const [bgUrl, setBgUrl] = useState('');
@@ -94,6 +96,23 @@ const Controls: React.FC<ControlsProps> = ({
     };
     getDevices();
   }, []);
+
+  // Click outside to close
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        isOpen && 
+        panelRef.current && 
+        !panelRef.current.contains(e.target as Node) &&
+        toggleBtnRef.current &&
+        !toggleBtnRef.current.contains(e.target as Node)
+      ) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isOpen]);
 
   const handleChange = <K extends keyof VisualizerConfig>(key: K, value: VisualizerConfig[K]) => {
     setConfig(prev => ({ ...prev, [key]: value }));
@@ -147,6 +166,7 @@ const Controls: React.FC<ControlsProps> = ({
     <>
       {/* Settings Toggle (Visible when closed) */}
       <button 
+        ref={toggleBtnRef}
         onClick={() => setIsOpen(true)}
         className={`absolute top-4 right-4 z-40 p-2 bg-black/50 text-white rounded-full hover:bg-black/80 backdrop-blur-md transition-all duration-300 hover:scale-110 active:scale-95 group shadow-[0_0_15px_rgba(0,0,0,0.5)] ${isOpen ? 'opacity-0 pointer-events-none translate-x-10' : 'opacity-100 translate-x-0'}`}
       >
@@ -191,7 +211,10 @@ const Controls: React.FC<ControlsProps> = ({
       )}
 
       {/* Sidebar Container */}
-      <div className={`absolute top-0 right-0 h-full w-80 bg-black/80 backdrop-blur-2xl text-white border-l border-white/10 z-50 flex flex-col shadow-[-5px_0_30px_rgba(0,0,0,0.5)] font-sans transform transition-transform duration-500 cubic-bezier(0.2, 0, 0, 1) ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+      <div 
+        ref={panelRef}
+        className={`absolute top-0 right-0 h-full w-80 bg-black/80 backdrop-blur-2xl text-white border-l border-white/10 z-50 flex flex-col shadow-[-5px_0_30px_rgba(0,0,0,0.5)] font-sans transform transition-transform duration-500 cubic-bezier(0.2, 0, 0, 1) ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}
+      >
         
         {/* Header Action Bar */}
         <div className="p-3 border-b border-white/10 flex items-center justify-between shrink-0 bg-white/5">

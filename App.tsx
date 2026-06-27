@@ -1027,6 +1027,7 @@ const App: React.FC = () => {
 
       <div className="absolute top-4 left-4 z-40 flex items-center gap-3">
         <button
+            onMouseDown={(e) => e.stopPropagation()}
             onClick={() => setIsMusicPlayerOpen(true)}
             className="group flex items-center justify-center w-12 h-12 bg-black/40 hover:bg-black/60 backdrop-blur-md rounded-full border border-white/10 hover:border-purple-500/50 shadow-lg transition-all"
             title="Open Music Player"
@@ -1128,6 +1129,7 @@ const App: React.FC = () => {
       {isUIHidden && (
         <div className="absolute top-4 right-4 z-50">
           <button
+            onMouseDown={(e) => e.stopPropagation()}
             onClick={() => setIsUIHidden(false)}
             className="p-2 bg-black/40 text-white/50 hover:text-white rounded-full backdrop-blur-md transition-all border border-white/5 hover:border-white/20 hover:scale-110 active:scale-95 shadow-xl"
           >
