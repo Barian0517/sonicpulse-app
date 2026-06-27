@@ -43,8 +43,12 @@ export const TrackList: React.FC<{
         const initialRating: Record<string, number> = {};
         const initialDownload: Record<string, 'none' | 'downloading' | 'downloaded'> = {};
 
+        // Sync with Netease global liked ids if applicable
+        const likedSet = new Set((window as any).__sonicpulse_liked_ids || []);
+        const isNetease = provider.name === 'Netease Cloud Music';
+
         tracks.forEach(t => {
-            initialStar[t.id] = t.isStarred || false;
+            initialStar[t.id] = isNetease ? likedSet.has(t.id) : (t.isStarred || false);
             initialRating[t.id] = t.rating || 0;
             if (offlineManager.isDownloaded(t.id)) {
                 initialDownload[t.id] = 'downloaded';
@@ -55,7 +59,23 @@ export const TrackList: React.FC<{
         setStarredStatus(initialStar);
         setRatings(initialRating);
         setDownloadStatus(initialDownload);
-    }, [tracks]);
+    }, [tracks, provider]);
+
+    useEffect(() => {
+        const syncLikedSongs = () => {
+            if (provider.name !== 'Netease Cloud Music') return;
+            const likedSet = new Set((window as any).__sonicpulse_liked_ids || []);
+            setStarredStatus(prev => {
+                const next = { ...prev };
+                tracks.forEach(t => {
+                    next[t.id] = likedSet.has(t.id);
+                });
+                return next;
+            });
+        };
+        window.addEventListener('sonicpulse-liked-songs-updated', syncLikedSongs);
+        return () => window.removeEventListener('sonicpulse-liked-songs-updated', syncLikedSongs);
+    }, [tracks, provider]);
 
     const handleToggleStar = async (e: React.MouseEvent, track: Track) => {
         e.stopPropagation();
@@ -63,7 +83,25 @@ export const TrackList: React.FC<{
         // Optimistic UI update
         setStarredStatus(prev => ({ ...prev, [track.id]: !current }));
         try {
-            await provider.star(track.id, 'track', !current);
+            if (provider.name === 'Netease Cloud Music') {
+                const ok = await (provider as any).likeSong(track.id, !current);
+                if (ok) {
+                    window.dispatchEvent(new CustomEvent('sonicpulse-toast', { detail: !current ? "已加入紅心歌曲" : "已取消紅心" }));
+                    
+                    // Update global cache
+                    const ids = new Set((window as any).__sonicpulse_liked_ids || []);
+                    if (!current) ids.add(track.id);
+                    else ids.delete(track.id);
+                    (window as any).__sonicpulse_liked_ids = Array.from(ids);
+                    
+                    window.dispatchEvent(new CustomEvent('sonicpulse-liked-songs-updated'));
+                } else {
+                    window.dispatchEvent(new CustomEvent('sonicpulse-toast', { detail: "加入紅心失敗" }));
+                    setStarredStatus(prev => ({ ...prev, [track.id]: current })); // Revert
+                }
+            } else {
+                await provider.star(track.id, 'track', !current);
+            }
         } catch (err) {
             console.error("Failed to star", err);
             // Revert on failure

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Settings, Music2, Disc, PlaySquare, Search, Library, FolderOpen, Play, Pause, SkipBack, SkipForward, Server, ChevronLeft } from 'lucide-react';
+import { Settings, Music2, Disc, PlaySquare, Search, Library, FolderOpen, Play, Pause, SkipBack, SkipForward, Server, ChevronLeft, Heart, RefreshCw } from 'lucide-react';
 import { open } from '@tauri-apps/plugin-dialog';
 import { convertFileSrc } from '@tauri-apps/api/core';
 import { LocalProvider } from '../../providers/LocalProvider';
@@ -35,12 +35,14 @@ export const MusicPlayerLayout: React.FC<{
     const timelineRef = useRef<HTMLDivElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
 
-    // Reset state when closed
-    useEffect(() => {
-        if (!isOpen) {
-            setActiveSource('local');
+    const handleSourceClick = (source: 'local' | 'navidrome' | 'netease' | 'settings') => {
+        if (activeSource === source) {
+            // Dispatch reload event for the active view to catch
+            window.dispatchEvent(new CustomEvent('sonicpulse-reload-source', { detail: source }));
+        } else {
+            setActiveSource(source);
         }
-    }, [isOpen]);
+    };
 
     // Click outside to close
     useEffect(() => {
@@ -61,6 +63,56 @@ export const MusicPlayerLayout: React.FC<{
     
     const [currentTrack, setCurrentTrack] = useState<Track | null>(null);
     const [isHoveringTimeline, setIsHoveringTimeline] = useState(false);
+    const [isCurrentTrackLiked, setIsCurrentTrackLiked] = useState(false);
+
+    useEffect(() => {
+        const checkLikedStatus = () => {
+            if (!currentTrack) {
+                setIsCurrentTrackLiked(false);
+                return;
+            }
+            if (currentTrack.source === 'netease') {
+                const likedSet = new Set((window as any).__sonicpulse_liked_ids || []);
+                setIsCurrentTrackLiked(likedSet.has(currentTrack.id));
+            } else {
+                setIsCurrentTrackLiked(currentTrack.isStarred || false);
+            }
+        };
+        checkLikedStatus();
+        window.addEventListener('sonicpulse-liked-songs-updated', checkLikedStatus);
+        return () => window.removeEventListener('sonicpulse-liked-songs-updated', checkLikedStatus);
+    }, [currentTrack]);
+
+    const handleToggleLike = async () => {
+        if (!currentTrack) return;
+        const currentStatus = isCurrentTrackLiked;
+        setIsCurrentTrackLiked(!currentStatus); // Optimistic UI
+        
+        try {
+            if (currentTrack.source === 'netease') {
+                const ok = await neteaseProvider.likeSong(currentTrack.id, !currentStatus);
+                if (ok) {
+                    window.dispatchEvent(new CustomEvent('sonicpulse-toast', { detail: !currentStatus ? "已加入紅心歌曲" : "已取消紅心" }));
+                    const ids = new Set((window as any).__sonicpulse_liked_ids || []);
+                    if (!currentStatus) ids.add(currentTrack.id);
+                    else ids.delete(currentTrack.id);
+                    (window as any).__sonicpulse_liked_ids = Array.from(ids);
+                    window.dispatchEvent(new CustomEvent('sonicpulse-liked-songs-updated'));
+                } else {
+                    window.dispatchEvent(new CustomEvent('sonicpulse-toast', { detail: "操作失敗" }));
+                    setIsCurrentTrackLiked(currentStatus); // Revert
+                }
+            } else {
+                const provider = currentTrack.source === 'local' ? localProvider : naviProvider;
+                await provider.star(currentTrack.id, 'track', !currentStatus);
+                setCurrentTrack(prev => prev ? { ...prev, isStarred: !currentStatus } : prev);
+                // Also update in queue if necessary, but this is fine for now
+            }
+        } catch (e) {
+            console.error(e);
+            setIsCurrentTrackLiked(currentStatus);
+        }
+    };
 
     // Queue State
     const [queue, setQueue] = useState<Track[]>([]);
@@ -132,7 +184,7 @@ export const MusicPlayerLayout: React.FC<{
             }
         } catch (e: any) {
             console.error(e);
-            alert("Failed to load folder: " + (e.message || String(e)));
+            window.dispatchEvent(new CustomEvent('sonicpulse-toast', { detail: "Failed to load folder: " + (e.message || String(e)) }));
         }
     };
 
@@ -146,7 +198,7 @@ export const MusicPlayerLayout: React.FC<{
             window.location.reload();
         } catch (e: any) {
             console.error(e);
-            alert("Invalid Netease Server URL");
+            window.dispatchEvent(new CustomEvent('sonicpulse-toast', { detail: "Invalid Netease Server URL" }));
         }
     };
 
@@ -161,7 +213,7 @@ export const MusicPlayerLayout: React.FC<{
             setTracks(initialTracks);
         } catch (e: any) {
             console.error(e);
-            alert("Failed to connect to Navidrome: " + (e.message || String(e)));
+            window.dispatchEvent(new CustomEvent('sonicpulse-toast', { detail: "Failed to connect to Navidrome: " + (e.message || String(e)) }));
         }
         setIsHoveringTimeline(false);
     };
@@ -213,8 +265,8 @@ export const MusicPlayerLayout: React.FC<{
                 url = await neteaseProvider.getStreamUrl(track.id);
             }
         } catch (e: any) {
-            console.error("Failed to get stream URL:", e);
-            alert(`無法取得這首歌曲的播放連結: ${e.message}`);
+            console.error("Play error:", e);
+            window.dispatchEvent(new CustomEvent('sonicpulse-toast', { detail: `無法取得這首歌曲的播放連結: ${e.message}` }));
             return;
         }
 
@@ -263,12 +315,20 @@ export const MusicPlayerLayout: React.FC<{
             playNow(tracksToInsert, 0);
             return;
         }
+        const insertIdx = queueIndex + 1;
         setQueue(prev => {
             const newQueue = [...prev];
-            newQueue.splice(queueIndex + 1, 0, ...tracksToInsert);
+            newQueue.splice(insertIdx, 0, ...tracksToInsert);
             return newQueue;
         });
-        alert(`已將 ${tracksToInsert.length} 首歌曲加入下一首播放`);
+        if (onQueueUpdate) {
+            onQueueUpdate([
+                ...queue.slice(0, insertIdx),
+                ...tracksToInsert,
+                ...queue.slice(insertIdx)
+            ], Math.min(queueIndex, insertIdx));
+            window.dispatchEvent(new CustomEvent('sonicpulse-toast', { detail: `已將 ${tracksToInsert.length} 首歌曲加入下一首播放` }));
+        }
     };
 
     const addToQueue = (tracksToAdd: Track[]) => {
@@ -278,7 +338,10 @@ export const MusicPlayerLayout: React.FC<{
             return;
         }
         setQueue(prev => [...prev, ...tracksToAdd]);
-        alert(`已將 ${tracksToAdd.length} 首歌曲加入播放序列`);
+        if (onQueueUpdate) {
+            onQueueUpdate([...queue, ...tracksToAdd], queueIndex);
+            window.dispatchEvent(new CustomEvent('sonicpulse-toast', { detail: `已將 ${tracksToAdd.length} 首歌曲加入播放序列` }));
+        }
     };
 
     const handleNext = () => {
@@ -371,26 +434,41 @@ export const MusicPlayerLayout: React.FC<{
             <div className="w-20 bg-[#050508]/80 backdrop-blur-3xl border-r border-white/10 flex flex-col items-center py-6 gap-6 shrink-0 relative z-20">
                 <div className="flex-1 w-full flex flex-col items-center gap-4 mt-8">
                     <button 
-                        onClick={() => setActiveSource('local')}
-                        className={`w-14 h-14 rounded-2xl flex flex-col items-center justify-center gap-1 transition-all duration-300 ${activeSource === 'local' ? 'bg-purple-500/20 text-purple-300 shadow-[0_0_20px_rgba(168,85,247,0.3)] border border-purple-500/30' : 'text-gray-500 hover:text-gray-300 hover:bg-white/5 hover:border hover:border-white/10'}`}
+                        onClick={() => handleSourceClick('local')}
+                        className={`group w-14 h-14 rounded-2xl flex flex-col items-center justify-center gap-1 transition-all duration-300 ${activeSource === 'local' ? 'bg-purple-500/20 text-purple-300 shadow-[0_0_20px_rgba(168,85,247,0.3)] border border-purple-500/30' : 'text-gray-500 hover:text-gray-300 hover:bg-white/5 hover:border hover:border-white/10'}`}
                     >
-                        <Library size={20} />
+                        <div className="relative w-5 h-5 flex items-center justify-center">
+                            <Library size={20} className={`absolute transition-opacity duration-300 ${activeSource === 'local' ? 'group-hover:opacity-0' : 'opacity-100'}`} />
+                            {activeSource === 'local' && (
+                                <RefreshCw size={18} className="absolute opacity-0 group-hover:opacity-100 transition-opacity duration-300 animate-[spin_3s_linear_infinite]" />
+                            )}
+                        </div>
                         <span className="text-[10px] font-medium">Local</span>
                     </button>
                     
                     <button 
-                         onClick={() => setActiveSource('navidrome')}
-                        className={`w-14 h-14 rounded-2xl flex flex-col items-center justify-center gap-1 transition-all duration-300 ${activeSource === 'navidrome' ? 'bg-purple-500/20 text-purple-300 shadow-[0_0_20px_rgba(168,85,247,0.3)] border border-purple-500/30' : 'text-gray-500 hover:text-gray-300 hover:bg-white/5 hover:border hover:border-white/10'}`}
+                         onClick={() => handleSourceClick('navidrome')}
+                        className={`group w-14 h-14 rounded-2xl flex flex-col items-center justify-center gap-1 transition-all duration-300 ${activeSource === 'navidrome' ? 'bg-purple-500/20 text-purple-300 shadow-[0_0_20px_rgba(168,85,247,0.3)] border border-purple-500/30' : 'text-gray-500 hover:text-gray-300 hover:bg-white/5 hover:border hover:border-white/10'}`}
                     >
-                        <Server size={20} />
+                        <div className="relative w-5 h-5 flex items-center justify-center">
+                            <Server size={20} className={`absolute transition-opacity duration-300 ${activeSource === 'navidrome' ? 'group-hover:opacity-0' : 'opacity-100'}`} />
+                            {activeSource === 'navidrome' && (
+                                <RefreshCw size={18} className="absolute opacity-0 group-hover:opacity-100 transition-opacity duration-300 animate-[spin_3s_linear_infinite]" />
+                            )}
+                        </div>
                         <span className="text-[10px] font-medium">Navidrome</span>
                     </button>
                     
                     <button 
-                         onClick={() => setActiveSource('netease')}
-                        className={`w-14 h-14 rounded-2xl flex flex-col items-center justify-center gap-1 transition-all duration-300 ${activeSource === 'netease' ? 'bg-red-500/20 text-red-400 shadow-[0_0_20px_rgba(239,68,68,0.3)] border border-red-500/30' : 'text-gray-500 hover:text-gray-300 hover:bg-white/5 hover:border hover:border-white/10'}`}
+                         onClick={() => handleSourceClick('netease')}
+                        className={`group w-14 h-14 rounded-2xl flex flex-col items-center justify-center gap-1 transition-all duration-300 ${activeSource === 'netease' ? 'bg-red-500/20 text-red-400 shadow-[0_0_20px_rgba(239,68,68,0.3)] border border-red-500/30' : 'text-gray-500 hover:text-gray-300 hover:bg-white/5 hover:border hover:border-white/10'}`}
                     >
-                        <Disc size={20} />
+                        <div className="relative w-5 h-5 flex items-center justify-center">
+                            <Disc size={20} className={`absolute transition-opacity duration-300 ${activeSource === 'netease' ? 'group-hover:opacity-0' : 'opacity-100'}`} />
+                            {activeSource === 'netease' && (
+                                <RefreshCw size={18} className="absolute opacity-0 group-hover:opacity-100 transition-opacity duration-300 animate-[spin_3s_linear_infinite]" />
+                            )}
+                        </div>
                         <span className="text-[10px] font-medium">網易雲</span>
                     </button>
                 </div>
@@ -551,10 +629,19 @@ export const MusicPlayerLayout: React.FC<{
                                 <Music2 size={24} className="text-gray-600" />
                             )}
                         </div>
-                        <div className="min-w-0">
+                        <div className="min-w-0 flex-1 pr-2">
                             <h4 className="font-bold text-sm text-white truncate">{currentTrack?.title || "No track playing"}</h4>
                             <p className="text-xs text-gray-400 truncate">{currentTrack?.artist || "-"}</p>
                         </div>
+                        {currentTrack && (
+                            <button 
+                                onClick={(e) => { e.stopPropagation(); handleToggleLike(); }}
+                                className={`p-2 transition-colors active:scale-95 ${isCurrentTrackLiked ? 'text-red-500' : 'text-gray-500 hover:text-white'}`}
+                                title={isCurrentTrackLiked ? "取消喜歡" : "加入喜歡"}
+                            >
+                                <Heart size={20} className={isCurrentTrackLiked ? "fill-current" : ""} />
+                            </button>
+                        )}
                     </div>
                     
                     <div className="flex-1 flex flex-col items-center gap-2">

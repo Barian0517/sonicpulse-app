@@ -195,7 +195,15 @@ export class NeteaseProvider implements MusicProvider {
             // Netease limits song/detail to ~1000 per request, we'll fetch first 100 for performance
             const idsStr = trackIds.slice(0, 100).join(',');
             const songRes = await this.request('/song/detail', { ids: idsStr });
-            tracks = (songRes.songs || []).map((s: any) => this.formatTrack(s));
+            const fetchedTracks = (songRes.songs || []).map((s: any) => this.formatTrack(s));
+            
+            // Re-order tracks to match the exact trackIds order (newest first from /likelist)
+            const trackMap = new Map<string, Track>();
+            fetchedTracks.forEach((t: Track) => trackMap.set(t.id, t));
+            
+            tracks = trackIds.slice(0, 100)
+                .map((id: any) => trackMap.get(String(id)))
+                .filter((t: Track | undefined): t is Track => t !== undefined);
         }
 
         return { artists: [], albums: [], tracks };
@@ -233,6 +241,26 @@ export class NeteaseProvider implements MusicProvider {
 
     async deletePlaylist(id: string): Promise<void> {
         await this.request('/playlist/delete', { id });
+    }
+
+    async getTopSongs(artistId: string): Promise<Track[]> {
+        const res = await this.request('/artist/top/song', { id: artistId });
+        return (res.songs || []).map((s: any) => this.formatTrack(s));
+    }
+
+    async getSimilarSongs(songId: string): Promise<Track[]> {
+        const res = await this.request('/simi/song', { id: songId });
+        return (res.songs || []).map((s: any) => this.formatTrack(s));
+    }
+
+    async likeSong(songId: string, like: boolean = true): Promise<boolean> {
+        try {
+            const res = await this.request('/like', { id: songId, like });
+            return res.code === 200;
+        } catch (e) {
+            console.error("Failed to like/unlike song:", e);
+            return false;
+        }
     }
 
     async getPlaylistTracks(playlistId: string): Promise<Track[]> {

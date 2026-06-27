@@ -136,6 +136,18 @@ export const NavidromeView: React.FC<{
     };
 
     useEffect(() => {
+        const handleReload = (e: any) => {
+            if (e.detail === 'navidrome') {
+                if (activeTab !== 'explore') {
+                    fetchTabContent(activeTab);
+                }
+            }
+        };
+        window.addEventListener('sonicpulse-reload-source', handleReload);
+        return () => window.removeEventListener('sonicpulse-reload-source', handleReload);
+    }, [activeTab]);
+
+    useEffect(() => {
         if (activeTab !== 'explore') {
             fetchTabContent(activeTab);
         }

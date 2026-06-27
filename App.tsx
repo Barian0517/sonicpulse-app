@@ -6,6 +6,7 @@ import Player from './components/Player';
 import ParticleOverlay from './components/ParticleOverlay';
 import { LyricsOverlay } from './components/LyricsOverlay';
 import { MusicPlayerLayout } from './components/MusicPlayer/MusicPlayerLayout';
+import { NeteaseProvider } from './providers/NeteaseProvider';
 import { VisualizerConfig, VisualizerShape, VisualizerDirection, VisualizerStyle, SymmetryMode, AudioSourceState, VisualizerMaterial, VisualizerParticleEffect } from './types';
 import { Track } from './providers/MusicProvider';
 import { translations, Language } from './translations';
@@ -215,12 +216,66 @@ const App: React.FC = () => {
   });
 
   // Player State
-  const [playlist, setPlaylist] = useState<{ name: string, url: string, file: File | null, track?: Track }[]>([]);
-  const [currentTrackIndex, setCurrentTrackIndex] = useState(-1);
+  const [mainPlaylist, setMainPlaylist] = useState<{ name: string, url: string, file: File | null, track?: Track }[]>([]);
+  const [mainTrackIndex, setMainTrackIndex] = useState(-1);
+  
+  const [roamPlaylist, setRoamPlaylist] = useState<{ name: string, url: string, file: File | null, track?: Track }[]>([]);
+  const [roamTrackIndex, setRoamTrackIndex] = useState(-1);
+  const [isRoamingMode, setIsRoamingMode] = useState(false);
+
+  const playlist = isRoamingMode ? roamPlaylist : mainPlaylist;
+  const currentTrackIndex = isRoamingMode ? roamTrackIndex : mainTrackIndex;
+
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isExternalQueue, setIsExternalQueue] = useState(false);
+  const [likedIds, setLikedIds] = useState<Set<string>>(new Set());
+
+  const fetchLikedIds = async () => {
+    try {
+        const provider = new NeteaseProvider();
+        const res = await provider.getStarred();
+        if (res.tracks) {
+            const ids = new Set(res.tracks.map(t => t.id));
+            setLikedIds(ids);
+            (window as any).__sonicpulse_liked_ids = Array.from(ids);
+            window.dispatchEvent(new CustomEvent('sonicpulse-liked-songs-updated', { detail: { noFetch: true } }));
+        }
+    } catch(e) {}
+  };
+
+  useEffect(() => {
+    fetchLikedIds();
+    const handleUpdate = (e: any) => {
+        if (e.detail?.noFetch) return;
+        fetchLikedIds();
+    };
+    window.addEventListener('sonicpulse-liked-songs-updated', handleUpdate);
+    return () => window.removeEventListener('sonicpulse-liked-songs-updated', handleUpdate);
+  }, []);
+
+  // Toast State
+  const [toastMessage, setToastMessage] = useState('');
+  const [toastVisible, setToastVisible] = useState(false);
+  const toastTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const showToast = (message: string) => {
+    setToastMessage(message);
+    setToastVisible(true);
+    if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+    toastTimeoutRef.current = setTimeout(() => {
+        setToastVisible(false);
+    }, 3000);
+  };
+
+  useEffect(() => {
+    const handleCustomToast = (e: any) => {
+        if (e.detail) showToast(e.detail);
+    };
+    window.addEventListener('sonicpulse-toast', handleCustomToast);
+    return () => window.removeEventListener('sonicpulse-toast', handleCustomToast);
+  }, []);
 
   // UI State
   const [isUIHidden, setIsUIHidden] = useState(false);
@@ -485,6 +540,21 @@ const App: React.FC = () => {
       sourceRef.current = null;
     }
     // Pause audio files
+    if (audioContextRef.current) {
+      audioContextRef.current.close();
+      audioContextRef.current = null;
+    }
+    setMainPlaylist([]);
+    setRoamPlaylist([]);
+    setIsRoamingMode(false);
+    setAudioState({
+      isPlaying: false,
+      mode: 'file',
+      fileName: '',
+      monitorAudio: false,
+      volume: 1,
+      sinkId: ''
+    });
     if (audio1Ref.current) {
       audio1Ref.current.pause();
       audio1Ref.current.src = '';
@@ -560,7 +630,7 @@ const App: React.FC = () => {
 
       // Crucial Check: Did they share audio?
       if (stream.getAudioTracks().length === 0) {
-        alert("No audio track found! Please ensure you check the 'Share Audio' box in the screen sharing dialog.");
+        showToast("未偵測到音訊軌！請確保在分享畫面時勾選「分享音訊」。");
         stream.getTracks().forEach(t => t.stop());
         return;
       }
@@ -614,12 +684,13 @@ const App: React.FC = () => {
       file: file
     }));
 
-    setPlaylist(newTracks);
-    setCurrentTrackIndex(0);
+    setMainPlaylist(newTracks);
+    setMainTrackIndex(0);
+    setIsRoamingMode(false);
     playTrack(newTracks[0]);
   };
 
-  const playTrack = (track: { name: string, url: string }) => {
+  const playTrack = (track: { name: string, url: string, file?: File | null, track?: any }) => {
     // Determine the next player for gapless swap
     const nextPlayerKey = activePlayerRef.current === 'audio1' ? 'audio2' : 'audio1';
     const nextPlayer = nextPlayerKey === 'audio1' ? audio1Ref.current : audio2Ref.current;
@@ -661,36 +732,119 @@ const App: React.FC = () => {
     }));
   };
 
-  const handleNextTrack = () => {
+  const handleNextTrack = async () => {
+    if (isRoamingMode) {
+        if (roamPlaylist.length === 0) return;
+        const nextIndex = roamTrackIndex + 1;
+        
+        // If we reach the end of the roaming playlist, fetch more!
+        if (nextIndex >= roamPlaylist.length) {
+            const lastTrack = roamPlaylist[roamPlaylist.length - 1].track;
+            if (lastTrack && lastTrack.id) {
+                try {
+                    const provider = new NeteaseProvider();
+                    const similar = await provider.getSimilarSongs(lastTrack.id);
+                    if (similar && similar.length > 0) {
+                        const newTracks = similar.map(s => ({
+                            name: s.title + (s.artist ? ` by ${s.artist}` : ''),
+                            url: '',
+                            file: null,
+                            track: s
+                        }));
+                        setRoamPlaylist(prev => [...prev, ...newTracks]);
+                        setRoamTrackIndex(nextIndex);
+                        playTrack(newTracks[0]);
+                        return;
+                    }
+                } catch (e) {
+                    console.error("Failed to fetch more roaming songs", e);
+                }
+            }
+        }
+        
+        // Normal roaming next
+        if (nextIndex < roamPlaylist.length) {
+            setRoamTrackIndex(nextIndex);
+            
+            const nextTrack = roamPlaylist[nextIndex];
+            let url = nextTrack.url || nextTrack.track?.streamUrl || '';
+            if (!url && nextTrack.track?.source === 'netease') {
+                try {
+                    const provider = new NeteaseProvider();
+                    url = await provider.getStreamUrl(nextTrack.track.id);
+                } catch(e){}
+            }
+            playTrack({ ...nextTrack, url });
+        }
+        return;
+    }
+
     if (isExternalQueue) {
       window.dispatchEvent(new CustomEvent('sonicpulse-play-next'));
       return;
     }
-    if (playlist.length === 0) return;
-    const nextIndex = (currentTrackIndex + 1) % playlist.length;
-    setCurrentTrackIndex(nextIndex);
-    playTrack(playlist[nextIndex]);
+    if (mainPlaylist.length === 0) return;
+    const nextIndex = (mainTrackIndex + 1) % mainPlaylist.length;
+    setMainTrackIndex(nextIndex);
+    playTrack(mainPlaylist[nextIndex]);
   };
 
-  const handlePrevTrack = () => {
+  const handlePrevTrack = async () => {
+    if (isRoamingMode) {
+        if (roamPlaylist.length === 0) return;
+        if (currentTime > 3) {
+            handleSeek(0);
+        } else if (roamTrackIndex > 0) {
+            const prevIndex = roamTrackIndex - 1;
+            setRoamTrackIndex(prevIndex);
+            
+            const prevTrack = roamPlaylist[prevIndex];
+            let url = prevTrack.url || prevTrack.track?.streamUrl || '';
+            if (!url && prevTrack.track?.source === 'netease') {
+                try {
+                    const provider = new NeteaseProvider();
+                    url = await provider.getStreamUrl(prevTrack.track.id);
+                } catch(e){}
+            }
+            playTrack({ ...prevTrack, url });
+        }
+        return;
+    }
+
     if (isExternalQueue) {
       window.dispatchEvent(new CustomEvent('sonicpulse-play-prev'));
       return;
     }
-    if (playlist.length === 0) return;
-    const prevIndex = (currentTrackIndex - 1 + playlist.length) % playlist.length;
-    setCurrentTrackIndex(prevIndex);
-    playTrack(playlist[prevIndex]);
+    if (mainPlaylist.length === 0) return;
+    const prevIndex = (mainTrackIndex - 1 + mainPlaylist.length) % mainPlaylist.length;
+    setMainTrackIndex(prevIndex);
+    playTrack(mainPlaylist[prevIndex]);
   };
 
-  const handleSelectTrack = (index: number) => {
+  const handleSelectTrack = async (index: number) => {
+    if (isRoamingMode) {
+        if (index < 0 || index >= roamPlaylist.length) return;
+        setRoamTrackIndex(index);
+        
+        const selected = roamPlaylist[index];
+        let url = selected.url || selected.track?.streamUrl || '';
+        if (!url && selected.track?.source === 'netease') {
+            try {
+                const provider = new NeteaseProvider();
+                url = await provider.getStreamUrl(selected.track.id);
+            } catch(e){}
+        }
+        playTrack({ ...selected, url });
+        return;
+    }
+
     if (isExternalQueue) {
       window.dispatchEvent(new CustomEvent('sonicpulse-play-index', { detail: index }));
       return;
     }
-    if (index < 0 || index >= playlist.length) return;
-    setCurrentTrackIndex(index);
-    playTrack(playlist[index]);
+    if (index < 0 || index >= mainPlaylist.length) return;
+    setMainTrackIndex(index);
+    playTrack(mainPlaylist[index]);
   };
 
   const handleOutputDeviceChange = async (deviceId: string) => {
@@ -867,8 +1021,8 @@ const App: React.FC = () => {
     const handleClear = () => {
       cleanupAudio();
       setAudioState(prev => ({ ...prev, isPlaying: false, fileName: '' }));
-      setPlaylist([]);
-      setCurrentTrackIndex(-1);
+      setMainPlaylist([]);
+      setMainTrackIndex(-1);
     };
     window.addEventListener('sonicpulse_clear_audio', handleClear);
     return () => window.removeEventListener('sonicpulse_clear_audio', handleClear);
@@ -890,7 +1044,7 @@ const App: React.FC = () => {
       // If we are playing from MusicPlayerLayout's queue, we should notify it.
       if (isExternalQueue) {
         window.dispatchEvent(new CustomEvent('sonicpulse-track-ended'));
-      } else if (playlist.length > 1) {
+      } else if (mainPlaylist.length > 1 || (isRoamingMode && roamPlaylist.length > 0)) {
         handleNextTrack();
       } else {
         setAudioState(prev => ({ ...prev, isPlaying: false }));
@@ -928,7 +1082,7 @@ const App: React.FC = () => {
           el.removeEventListener('pause', onPause);
       });
     };
-  }, [isAutoRender, playlist]);
+  }, [isAutoRender, mainPlaylist, isRoamingMode, roamPlaylist]);
 
   // Overlay Window internal state
   const [isThisOverlayLocked, setIsThisOverlayLocked] = useState(() => {
@@ -1006,6 +1160,14 @@ const App: React.FC = () => {
 
   return (
     <div className="relative w-screen h-screen bg-black overflow-hidden font-sans">
+      {/* Toast Notification */}
+      <div 
+        className={`fixed top-8 left-1/2 -translate-x-1/2 z-[100] px-6 py-3 rounded-full bg-[#1e1e2e]/90 backdrop-blur-md border border-white/10 shadow-[0_10px_40px_rgba(0,0,0,0.5)] text-white text-sm font-medium transition-all duration-500 pointer-events-none flex items-center gap-3 ${toastVisible ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-8'}`}
+      >
+        <div className="w-2 h-2 rounded-full bg-purple-500 animate-pulse" />
+        {toastMessage}
+      </div>
+
       {/* Hidden Video for Stream Keep-Alive */}
       <video ref={hiddenVideoRef} className="hidden" playsInline muted />
 
@@ -1058,15 +1220,16 @@ const App: React.FC = () => {
               };
               // Only override playlist if we aren't using an external queue
               if (!isExternalQueue) {
-                  setPlaylist([mapped]);
-                  setCurrentTrackIndex(0);
+                  setMainPlaylist([mapped]);
+                  setMainTrackIndex(0);
+                  setIsRoamingMode(false);
               }
               playTrack(mapped);
           }}
           onQueueUpdate={(queue, currentIndex) => {
               setIsExternalQueue(true);
-              setPlaylist(queue.map(q => ({ name: q.title + (q.artist ? ` by ${q.artist}` : ''), url: '', file: null, track: q })));
-              setCurrentTrackIndex(currentIndex);
+              setMainPlaylist(queue.map(q => ({ name: q.title + (q.artist ? ` by ${q.artist}` : ''), url: '', file: null, track: q })));
+              setMainTrackIndex(currentIndex);
           }}
           isLyricsEnabled={config.lyricsEnabled}
           onToggleLyrics={() => setConfig(prev => ({ ...prev, lyricsEnabled: !prev.lyricsEnabled }))}
@@ -1077,13 +1240,13 @@ const App: React.FC = () => {
           ref={canvasRef} 
           analyser={analyserRef.current} 
           config={config} 
-          albumCoverUrl={playlist[currentTrackIndex]?.track?.coverUrl || null} 
+          albumCoverUrl={(isRoamingMode ? roamPlaylist[roamTrackIndex]?.track?.coverUrl : mainPlaylist[mainTrackIndex]?.track?.coverUrl) || null} 
       />
 
       {/* Lyrics Overlay */}
-      {audioState.mode === 'file' && playlist[currentTrackIndex]?.track && (
+      {audioState.mode === 'file' && (isRoamingMode ? roamPlaylist[roamTrackIndex]?.track : mainPlaylist[mainTrackIndex]?.track) && (
          <LyricsOverlay 
-             track={playlist[currentTrackIndex].track!}
+             track={(isRoamingMode ? roamPlaylist[roamTrackIndex]!.track! : mainPlaylist[mainTrackIndex]!.track!)}
              currentTime={currentTime}
              config={config}
          />
@@ -1150,11 +1313,126 @@ const App: React.FC = () => {
             onTogglePlay={togglePlay}
             onSeek={handleSeek}
             onVolumeChange={handleVolumeChange}
-            playlist={playlist}
-            currentIndex={currentTrackIndex}
+            playlist={isRoamingMode ? roamPlaylist : mainPlaylist}
             onNext={handleNextTrack}
             onPrev={handlePrevTrack}
+            currentIndex={isRoamingMode ? roamTrackIndex : mainTrackIndex}
             onSelectTrack={handleSelectTrack}
+            isRoamingMode={isRoamingMode}
+            onToggleRoaming={async (mode) => {
+                setIsRoamingMode(mode);
+                if (mode) {
+                    if (roamPlaylist.length > 0 && roamTrackIndex >= 0) {
+                        const target = roamPlaylist[roamTrackIndex];
+                        let url = target.url || target.track?.streamUrl || '';
+                        if (!url && target.track?.source === 'netease') {
+                            try {
+                                const provider = new NeteaseProvider();
+                                url = await provider.getStreamUrl(target.track.id);
+                            } catch(e){}
+                        }
+                        playTrack({ ...target, url });
+                    } else if (mainPlaylist.length > 0 && mainTrackIndex >= 0) {
+                        const track = mainPlaylist[mainTrackIndex].track;
+                        if (track) {
+                            if (track.source !== 'netease') {
+                                showToast("漫遊功能目前僅支援網易雲音樂的歌曲哦！");
+                                setIsRoamingMode(false);
+                                return;
+                            }
+                            showToast("正在加載漫遊列表...");
+                            try {
+                                const provider = new NeteaseProvider();
+                                const similar = await provider.getSimilarSongs(track.id);
+                                const newRoam = [
+                                    { name: track.title, url: '', file: null, track },
+                                    ...similar.map(s => ({ name: s.title, url: '', file: null, track: s }))
+                                ];
+                                setRoamPlaylist(newRoam);
+                                setRoamTrackIndex(0);
+                                
+                                let url = track.streamUrl || '';
+                                if (!url && track.source === 'netease') {
+                                    url = await provider.getStreamUrl(track.id);
+                                }
+                                playTrack({ name: track.title, url, file: null, track });
+                                showToast("已為您開啟相似歌曲漫遊");
+                            } catch(e) {
+                                console.error("Failed to start roaming", e);
+                                showToast("開啟漫遊失敗，請稍後再試");
+                                setIsRoamingMode(false);
+                            }
+                        }
+                    }
+                } else {
+                    if (mainPlaylist.length > 0 && mainTrackIndex >= 0) {
+                        const target = mainPlaylist[mainTrackIndex];
+                        let url = target.url || target.track?.streamUrl || '';
+                        if (!url && target.track?.source === 'netease') {
+                            try {
+                                const provider = new NeteaseProvider();
+                                url = await provider.getStreamUrl(target.track.id);
+                            } catch(e){}
+                        }
+                        playTrack({ ...target, url });
+                    }
+                }
+            }}
+            onStartRoaming={async (track) => {
+                if (track.source !== 'netease') {
+                    showToast("漫遊功能目前僅支援網易雲音樂的歌曲哦！");
+                    return;
+                }
+                try {
+                    const provider = new NeteaseProvider();
+                    const similar = await provider.getSimilarSongs(track.id);
+                    const newRoam = [
+                        { name: track.title, url: '', file: null, track },
+                        ...similar.map(s => ({ name: s.title, url: '', file: null, track: s }))
+                    ];
+                    setRoamPlaylist(newRoam);
+                    setRoamTrackIndex(0);
+                    setIsRoamingMode(true);
+                    
+                    // We must play it! Wait, we need the streamUrl.
+                    // We can emit sonicpulse-play-index to let Netease/MusicPlayerLayout handle URL resolving!
+                    // Wait, MusicPlayerLayout's queue isn't updated. 
+                    // To get the URL, we need to call provider.getStreamUrl
+                    let url = track.streamUrl || '';
+                    if (!url && track.source === 'netease') {
+                        url = await provider.getStreamUrl(track.id);
+                    }
+                    playTrack({ name: track.title, url, file: null, track });
+                    showToast("已為您開啟相似歌曲漫遊");
+                } catch(e) {
+                    console.error("Failed to start roaming", e);
+                    showToast("開啟漫遊失敗，請稍後再試");
+                }
+            }}
+            onLikeTrack={async (track) => {
+                if (track.source !== 'netease') {
+                    showToast("只有網易雲音樂的歌曲可以加入紅心");
+                    return;
+                }
+                try {
+                    const provider = new NeteaseProvider();
+                    // Toggle like state: if already liked, unlike it.
+                    const currentlyLiked = track ? likedIds.has(track.id) : false;
+                    const ok = await provider.likeSong(track.id, !currentlyLiked);
+                    if (ok) {
+                        showToast(!currentlyLiked ? "已加入紅心歌曲！" : "已取消紅心！");
+                        window.dispatchEvent(new CustomEvent('sonicpulse-liked-songs-updated'));
+                    } else {
+                        showToast("操作失敗，請確認網易雲登入狀態。");
+                    }
+                } catch(e: any) { 
+                    showToast("加入失敗: " + e.message);
+                }
+            }}
+            isLiked={(() => {
+                const tr = isRoamingMode ? roamPlaylist[roamTrackIndex]?.track : mainPlaylist[mainTrackIndex]?.track;
+                return tr ? likedIds.has(tr.id) : false;
+            })()}
           />
         )}
       </div>

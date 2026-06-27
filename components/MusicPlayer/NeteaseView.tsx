@@ -81,17 +81,60 @@ export const NeteaseView: React.FC<{
         }
     };
 
-    useEffect(() => {
-        if (activeTab === 'playlists') {
-            fetchPlaylists();
-        } else if (activeTab === 'favorites') {
-            setIsLoading(true);
-            provider.getStarred().then(res => {
-                setTracks(res.tracks);
-            }).catch(e => console.error(e)).finally(() => setIsLoading(false));
-        } else if (activeTab === 'login' && !isLoggedIn) {
-            startLoginFlow();
+    const createPlaylist = async (name: string) => {
+        try {
+            const pl = await provider.createPlaylist(name);
+            setPlaylists(prev => [pl, ...prev]);
+            window.dispatchEvent(new CustomEvent('sonicpulse-toast', { detail: "歌單建立成功" }));
+        } catch (e: any) {
+            console.error(e);
+            window.dispatchEvent(new CustomEvent('sonicpulse-toast', { detail: "建立歌單失敗: " + e.message }));
         }
+    };
+
+    const deletePlaylist = async (id: string) => {
+        try {
+            await provider.deletePlaylist(id);
+            setPlaylists(prev => prev.filter(p => p.id !== id));
+            window.dispatchEvent(new CustomEvent('sonicpulse-toast', { detail: "歌單已刪除" }));
+        } catch (e: any) {
+            console.error(e);
+            window.dispatchEvent(new CustomEvent('sonicpulse-toast', { detail: "刪除歌單失敗: " + e.message }));
+        }
+    };
+
+    useEffect(() => {
+        const loadTab = () => {
+            if (activeTab === 'playlists') {
+                fetchPlaylists();
+            } else if (activeTab === 'favorites') {
+                setIsLoading(true);
+                provider.getStarred().then(res => {
+                    setTracks(res.tracks);
+                }).catch(e => console.error(e)).finally(() => setIsLoading(false));
+            } else if (activeTab === 'login' && !isLoggedIn) {
+                startLoginFlow();
+            }
+        };
+        
+        loadTab();
+        
+        const handleLikedUpdate = () => {
+            if (activeTab === 'favorites') loadTab();
+        };
+        
+        const handleReload = (e: any) => {
+            if (e.detail === 'netease') {
+                loadTab();
+            }
+        };
+
+        window.addEventListener('sonicpulse-liked-songs-updated', handleLikedUpdate);
+        window.addEventListener('sonicpulse-reload-source', handleReload);
+        return () => {
+            window.removeEventListener('sonicpulse-liked-songs-updated', handleLikedUpdate);
+            window.removeEventListener('sonicpulse-reload-source', handleReload);
+        };
     }, [activeTab, isLoggedIn]);
 
     const startLoginFlow = async () => {
@@ -200,8 +243,10 @@ export const NeteaseView: React.FC<{
     const handleLogout = () => {
         localStorage.removeItem('netease_cookie');
         localStorage.removeItem('netease_uid');
+        provider.setCookie('');
         setIsLoggedIn(false);
         setActiveTab('login');
+        window.dispatchEvent(new CustomEvent('sonicpulse-toast', { detail: "已登出網易雲音樂" }));
     };
 
     return (

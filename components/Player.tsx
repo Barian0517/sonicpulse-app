@@ -16,7 +16,15 @@ interface PlayerProps {
   onNext?: () => void;
   onPrev?: () => void;
   onSelectTrack?: (index: number) => void;
+  
+  isRoamingMode?: boolean;
+  onToggleRoaming?: (isRoaming: boolean) => void;
+  onStartRoaming?: (track: any) => void;
+  onLikeTrack?: (track: any) => void;
+  isLiked?: boolean;
 }
+
+import { Compass, Heart as HeartIcon, Plus } from 'lucide-react';
 
 const formatTime = (seconds: number) => {
   if (!seconds || isNaN(seconds)) return "00:00";
@@ -38,7 +46,12 @@ const Player: React.FC<PlayerProps> = ({
   currentIndex = -1,
   onNext,
   onPrev,
-  onSelectTrack
+  onSelectTrack,
+  isRoamingMode = false,
+  onToggleRoaming,
+  onStartRoaming,
+  onLikeTrack,
+  isLiked = false
 }) => {
   const [isHovering, setIsHovering] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
@@ -205,7 +218,7 @@ const Player: React.FC<PlayerProps> = ({
 
             {/* Header Controls */}
             <div className="flex justify-between items-center relative z-10 h-6 shrink-0">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 w-24">
                     {showPlaylist ? (
                         <button onClick={(e) => { e.stopPropagation(); setShowPlaylist(false); }} className="text-gray-400 hover:text-white transition-colors flex items-center gap-1 group/back">
                             <ArrowLeft size={16} className="group-hover/back:-translate-x-1 transition-transform" />
@@ -214,11 +227,28 @@ const Player: React.FC<PlayerProps> = ({
                     ) : (
                         <span className="text-[10px] font-black text-purple-400/80 uppercase tracking-[0.2em] flex items-center gap-2">
                             {renderEQBars()}
-                            {isPlaying ? "Now Playing" : "Paused"}
+                            {isPlaying ? "PLAYING" : "PAUSED"}
                         </span>
                     )}
                 </div>
-                <div className="flex items-center gap-1">
+                
+                {/* Center Toggle Switch */}
+                <div className="flex items-center bg-black/40 rounded-full p-1 border border-white/5 shadow-inner" onClick={(e) => e.stopPropagation()}>
+                    <button 
+                        onClick={() => onToggleRoaming && onToggleRoaming(false)}
+                        className={`px-4 py-1 rounded-full text-xs font-bold transition-all duration-300 ${!isRoamingMode ? 'bg-white/10 text-white shadow-md' : 'text-gray-500 hover:text-gray-300'}`}
+                    >
+                        序列
+                    </button>
+                    <button 
+                        onClick={() => onToggleRoaming && onToggleRoaming(true)}
+                        className={`px-4 py-1 rounded-full text-xs font-bold transition-all duration-300 ${isRoamingMode ? 'bg-purple-500/30 text-purple-200 shadow-md border border-purple-500/20' : 'text-gray-500 hover:text-gray-300'}`}
+                    >
+                        漫遊
+                    </button>
+                </div>
+
+                <div className="flex items-center justify-end gap-1 w-24">
                     {!showPlaylist && (
                         <button 
                             onClick={(e) => { e.stopPropagation(); setShowPlaylist(true); }}
@@ -254,10 +284,37 @@ const Player: React.FC<PlayerProps> = ({
                             <div className="absolute inset-0 bg-black/20 opacity-0 group-hover/cover:opacity-100 transition-opacity duration-300 pointer-events-none" />
                         </div>
 
-                        {/* Info */}
-                        <div className="flex-1 min-w-0 flex flex-col justify-center">
-                            <h3 className="text-white font-extrabold text-2xl truncate leading-tight mb-1 tracking-tight">{currentTrackObj?.title || fileName || "Unknown Track"}</h3>
-                            <p className="text-purple-300/60 text-sm font-medium truncate">{currentTrackObj?.artist || (playlist.length > 0 ? "Playlist Track" : "Local File")}</p>
+                        {/* Info & Actions */}
+                        <div className="flex-1 min-w-0 flex justify-between items-end">
+                            <div className="flex flex-col justify-center min-w-0 flex-1 pr-4">
+                                <h3 className="text-white font-extrabold text-2xl truncate leading-tight mb-1 tracking-tight">{currentTrackObj?.title || fileName || "Unknown Track"}</h3>
+                                <p className="text-purple-300/60 text-sm font-medium truncate">{currentTrackObj?.artist || (playlist.length > 0 ? "Playlist Track" : "Local File")}</p>
+                            </div>
+                            
+                            {/* Action Buttons */}
+                            <div className="flex items-center gap-2 pb-1 shrink-0">
+                                <button 
+                                    onClick={(e) => { e.stopPropagation(); if (currentTrackObj && onLikeTrack) onLikeTrack(currentTrackObj); }}
+                                    className={`p-2.5 rounded-full border transition-all group/btn active:scale-95 ${isLiked ? 'bg-red-500/20 border-red-500/40 text-red-500' : 'bg-white/5 border-white/5 hover:bg-red-500/20 hover:border-red-500/40 hover:text-red-400 text-gray-400'}`}
+                                    title={isLiked ? "取消紅心" : "收藏到紅心"}
+                                >
+                                    <HeartIcon size={16} className={isLiked ? "fill-current" : "group-hover/btn:scale-110 transition-transform"} />
+                                </button>
+                                <button 
+                                    onClick={(e) => { e.stopPropagation(); if (currentTrackObj && onStartRoaming) onStartRoaming(currentTrackObj); }}
+                                    className={`p-2.5 rounded-full transition-all group/btn active:scale-95 ${isRoamingMode ? 'bg-purple-500/30 border border-purple-500/50 text-purple-300 shadow-[0_0_15px_rgba(168,85,247,0.4)]' : 'bg-white/5 border border-white/5 hover:bg-purple-500/20 hover:border-purple-500/40 hover:text-purple-400 text-gray-400'}`}
+                                    title="開啟漫遊"
+                                >
+                                    <Compass size={16} className={`transition-transform ${isRoamingMode ? 'animate-[spin_4s_linear_infinite]' : 'group-hover/btn:rotate-45'}`} />
+                                </button>
+                                <button 
+                                    onClick={(e) => { e.stopPropagation(); }}
+                                    className="p-2.5 rounded-full bg-white/5 border border-white/5 hover:bg-white/10 hover:border-white/20 text-gray-400 hover:text-white transition-all group/btn active:scale-95"
+                                    title="加入歌單"
+                                >
+                                    <Plus size={16} className="group-hover/btn:scale-110 transition-transform" />
+                                </button>
+                            </div>
                         </div>
                     </div>
 
