@@ -1,13 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Settings, Music2, Disc, PlaySquare, Search, Library, FolderOpen, Play, Pause, SkipBack, SkipForward, Server, ChevronLeft, Heart, RefreshCw } from 'lucide-react';
+import { Settings, Music2, Disc, PlaySquare, Search, Library, FolderOpen, Play, Pause, SkipBack, SkipForward, Server, ChevronLeft, Heart, RefreshCw, Plug } from 'lucide-react';
 import { open } from '@tauri-apps/plugin-dialog';
 import { convertFileSrc } from '@tauri-apps/api/core';
 import { LocalProvider } from '../../providers/LocalProvider';
 import { NavidromeProvider } from '../../providers/NavidromeProvider';
 import { NeteaseProvider } from '../../providers/NeteaseProvider';
+import { MusicFreeProvider } from '../../providers/MusicFreeProvider';
 import { Track, Album } from '../../providers/MusicProvider';
 import { NavidromeView } from './NavidromeView';
 import { NeteaseView } from './NeteaseView';
+import { MusicFreeView } from './MusicFreeView';
 
 export const MusicPlayerLayout: React.FC<{ 
     isOpen: boolean; 
@@ -21,10 +23,11 @@ export const MusicPlayerLayout: React.FC<{
     isLyricsEnabled?: boolean;
     onToggleLyrics?: () => void;
 }> = ({ isOpen, onClose, playbackState, onTogglePlay, onSeek, onVolumeChange, onPlay, onQueueUpdate, isLyricsEnabled, onToggleLyrics }) => {
-    const [activeSource, setActiveSource] = useState<'local' | 'navidrome' | 'netease' | 'settings'>('local');
+    const [activeSource, setActiveSource] = useState<'local' | 'navidrome' | 'netease' | 'musicfree' | 'settings'>('local');
     const [localProvider] = useState(() => new LocalProvider());
     const [naviProvider] = useState(() => new NavidromeProvider());
     const [neteaseProvider] = useState(() => new NeteaseProvider());
+    const [musicFreeProvider] = useState(() => new MusicFreeProvider());
     
     // Search & Filter State
     const [searchQuery, setSearchQuery] = useState('');
@@ -35,7 +38,7 @@ export const MusicPlayerLayout: React.FC<{
     const timelineRef = useRef<HTMLDivElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
 
-    const handleSourceClick = (source: 'local' | 'navidrome' | 'netease' | 'settings') => {
+    const handleSourceClick = (source: 'local' | 'navidrome' | 'netease' | 'musicfree' | 'settings') => {
         if (activeSource === source) {
             // Dispatch reload event for the active view to catch
             window.dispatchEvent(new CustomEvent('sonicpulse-reload-source', { detail: source }));
@@ -102,6 +105,14 @@ export const MusicPlayerLayout: React.FC<{
                     window.dispatchEvent(new CustomEvent('sonicpulse-toast', { detail: "操作失敗" }));
                     setIsCurrentTrackLiked(currentStatus); // Revert
                 }
+            } else if (currentTrack.source === 'musicfree') {
+                await musicFreeProvider.toggleStarTrack(currentTrack);
+                window.dispatchEvent(new CustomEvent('sonicpulse-toast', { detail: !currentStatus ? "已加入紅心歌曲" : "已取消紅心" }));
+                const ids = new Set((window as any).__sonicpulse_liked_ids || []);
+                if (!currentStatus) ids.add(currentTrack.id);
+                else ids.delete(currentTrack.id);
+                (window as any).__sonicpulse_liked_ids = Array.from(ids);
+                window.dispatchEvent(new CustomEvent('sonicpulse-liked-songs-updated'));
             } else {
                 const provider = currentTrack.source === 'local' ? localProvider : naviProvider;
                 await provider.star(currentTrack.id, 'track', !currentStatus);
@@ -127,6 +138,18 @@ export const MusicPlayerLayout: React.FC<{
     // Netease Settings State
     const [neteaseUrl, setNeteaseUrl] = useState(localStorage.getItem('netease_server_url') || 'https://netease-cloud-music-api-v3.vercel.app');
     const [isNeteaseReady, setIsNeteaseReady] = useState(!!localStorage.getItem('netease_server_url'));
+
+    // MusicFree Settings State
+    const [musicFreePluginDir, setMusicFreePluginDir] = useState('');
+
+    useEffect(() => {
+        // Fetch current musicfree config
+        fetch('http://127.0.0.1:30001/config')
+            .then(r => r.json())
+            .then(data => {
+                if (data.pluginDir) setMusicFreePluginDir(data.pluginDir);
+            }).catch(e => console.error("Failed to fetch musicfree config"));
+    }, []);
 
     useEffect(() => {
         const loadSaved = async () => {
@@ -216,6 +239,30 @@ export const MusicPlayerLayout: React.FC<{
             window.dispatchEvent(new CustomEvent('sonicpulse-toast', { detail: "Failed to connect to Navidrome: " + (e.message || String(e)) }));
         }
         setIsHoveringTimeline(false);
+    };
+
+    const handleSelectMusicFreeFolder = async () => {
+        try {
+            const selected = await open({
+                directory: true,
+                multiple: false
+            });
+            if (selected && typeof selected === 'string') {
+                const res = await fetch('http://127.0.0.1:30001/config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ pluginDir: selected })
+                });
+                if (res.ok) {
+                    setMusicFreePluginDir(selected);
+                    window.dispatchEvent(new CustomEvent('sonicpulse-toast', { detail: "MusicFree 插件目錄已更新" }));
+                    window.dispatchEvent(new CustomEvent('sonicpulse-reload-source', { detail: 'musicfree' }));
+                }
+            }
+        } catch (e: any) {
+            console.error(e);
+            window.dispatchEvent(new CustomEvent('sonicpulse-toast', { detail: "操作失敗" }));
+        }
     };
 
     const handleTimelineMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -471,6 +518,19 @@ export const MusicPlayerLayout: React.FC<{
                         </div>
                         <span className="text-[10px] font-medium">網易雲</span>
                     </button>
+
+                    <button 
+                         onClick={() => handleSourceClick('musicfree')}
+                        className={`group w-14 h-14 rounded-2xl flex flex-col items-center justify-center gap-1 transition-all duration-300 ${activeSource === 'musicfree' ? 'bg-cyan-500/20 text-cyan-400 shadow-[0_0_20px_rgba(6,182,212,0.3)] border border-cyan-500/30' : 'text-gray-500 hover:text-gray-300 hover:bg-white/5 hover:border hover:border-white/10'}`}
+                    >
+                        <div className="relative w-5 h-5 flex items-center justify-center">
+                            <Plug size={20} className={`absolute transition-opacity duration-300 ${activeSource === 'musicfree' ? 'group-hover:opacity-0' : 'opacity-100'}`} />
+                            {activeSource === 'musicfree' && (
+                                <RefreshCw size={18} className="absolute opacity-0 group-hover:opacity-100 transition-opacity duration-300 animate-[spin_3s_linear_infinite]" />
+                            )}
+                        </div>
+                        <span className="text-[10px] font-medium">插件</span>
+                    </button>
                 </div>
 
                 <div className="w-full flex flex-col items-center gap-4 mt-auto">
@@ -590,6 +650,18 @@ export const MusicPlayerLayout: React.FC<{
                         </div>
                     )}
 
+                    {activeSource === 'musicfree' && (
+                        <div className="w-full h-full pb-24">
+                            <MusicFreeView 
+                                provider={musicFreeProvider} 
+                                onPlayTrack={playTrack}
+                                onPlayNow={playNow}
+                                currentTrackId={currentTrack?.id} 
+                                isPlaying={isPlaying} 
+                            />
+                        </div>
+                    )}
+
                     {activeSource === 'settings' && (
                         <div className="w-full h-full flex flex-col items-center justify-center p-8">
                             <div className="w-full max-w-md bg-white/5 p-8 rounded-2xl border border-white/10">
@@ -600,6 +672,14 @@ export const MusicPlayerLayout: React.FC<{
                                     <p className="text-sm text-gray-400 mb-4">Current folder: {localStorage.getItem('local_music_folder') || 'Not set'}</p>
                                     <button onClick={handleSelectLocalFolder} className="bg-white/10 hover:bg-white/20 px-6 py-2 rounded-lg font-bold text-sm transition-all">
                                         Change Folder
+                                    </button>
+                                </div>
+
+                                <div className="mb-8">
+                                    <h3 className="text-lg font-bold mb-4 flex items-center gap-2"><Plug size={20} className="text-purple-400" /> MusicFree 插件</h3>
+                                    <p className="text-sm text-gray-400 mb-4 break-all">目前資料夾: {musicFreePluginDir || '預設'}</p>
+                                    <button onClick={handleSelectMusicFreeFolder} className="bg-white/10 hover:bg-white/20 px-6 py-2 rounded-lg font-bold text-sm transition-all">
+                                        更換資料夾
                                     </button>
                                 </div>
 

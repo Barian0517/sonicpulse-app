@@ -7,6 +7,7 @@ import ParticleOverlay from './components/ParticleOverlay';
 import { LyricsOverlay } from './components/LyricsOverlay';
 import { MusicPlayerLayout } from './components/MusicPlayer/MusicPlayerLayout';
 import { NeteaseProvider } from './providers/NeteaseProvider';
+import { MusicFreeProvider } from './providers/MusicFreeProvider';
 import { VisualizerConfig, VisualizerShape, VisualizerDirection, VisualizerStyle, SymmetryMode, AudioSourceState, VisualizerMaterial, VisualizerParticleEffect } from './types';
 import { Track } from './providers/MusicProvider';
 import { translations, Language } from './translations';
@@ -234,14 +235,26 @@ const App: React.FC = () => {
 
   const fetchLikedIds = async () => {
     try {
-        const provider = new NeteaseProvider();
-        const res = await provider.getStarred();
-        if (res.tracks) {
-            const ids = new Set(res.tracks.map(t => t.id));
-            setLikedIds(ids);
-            (window as any).__sonicpulse_liked_ids = Array.from(ids);
-            window.dispatchEvent(new CustomEvent('sonicpulse-liked-songs-updated', { detail: { noFetch: true } }));
+        const neteaseProvider = new NeteaseProvider();
+        const musicFreeProvider = new MusicFreeProvider();
+        
+        const [neteaseRes, musicFreeRes] = await Promise.allSettled([
+            neteaseProvider.getStarred(),
+            musicFreeProvider.getStarred()
+        ]);
+
+        const allIds = new Set<string>();
+        
+        if (neteaseRes.status === 'fulfilled' && neteaseRes.value.tracks) {
+            neteaseRes.value.tracks.forEach(t => allIds.add(String(t.id)));
         }
+        if (musicFreeRes.status === 'fulfilled' && musicFreeRes.value.tracks) {
+            musicFreeRes.value.tracks.forEach(t => allIds.add(String(t.id)));
+        }
+
+        setLikedIds(allIds);
+        (window as any).__sonicpulse_liked_ids = Array.from(allIds);
+        window.dispatchEvent(new CustomEvent('sonicpulse-liked-songs-updated', { detail: { noFetch: true } }));
     } catch(e) {}
   };
 
