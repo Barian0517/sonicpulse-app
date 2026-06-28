@@ -256,46 +256,46 @@ export const MusicFreeView: React.FC<{
     };
 
     return (
-        <div className="flex h-full w-full bg-transparent text-white overflow-hidden">
-            {/* Sidebar */}
-            <div className="w-56 bg-black/40 border-r border-white/10 flex flex-col py-6 px-4 gap-2 backdrop-blur-md shrink-0">
-                <div className="flex items-center gap-3 px-3 pb-6 mb-2 border-b border-white/5">
-                    <Plug className="text-purple-400" size={24} />
-                    <span className="font-black text-lg tracking-wide text-white">MusicFree</span>
+        <div className="flex flex-col md:flex-row h-full w-full bg-transparent text-white overflow-hidden">
+            {/* Sidebar / Top Nav */}
+            <div className="w-full h-auto md:w-56 bg-black/40 border-b md:border-b-0 md:border-r border-white/10 flex flex-row md:flex-col py-2 md:py-6 px-2 md:px-4 gap-2 backdrop-blur-md shrink-0 overflow-x-auto md:overflow-y-auto hide-scrollbar items-center md:items-stretch">
+                <div className="flex items-center gap-2 md:gap-3 px-2 md:px-3 md:pb-6 md:mb-2 md:border-b border-white/5 shrink-0">
+                    <Plug className="text-purple-400" size={18} />
+                    <span className="hidden md:inline font-black text-lg tracking-wide text-white">MusicFree</span>
                 </div>
 
-                <div className="flex flex-col gap-1 flex-1">
+                <div className="flex flex-row md:flex-col gap-1 md:flex-1 shrink-0">
                     <button
                         onClick={() => setActiveTab('search')}
-                        className={`flex items-center gap-3 px-4 py-2.5 rounded-xl font-medium transition-all ${activeTab === 'search' ? 'bg-purple-500 text-white shadow-[0_0_20px_rgba(168,85,247,0.3)]' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
+                        className={`whitespace-nowrap flex items-center gap-2 md:gap-3 px-3 md:px-4 py-1.5 md:py-2.5 rounded-full md:rounded-xl font-medium transition-all text-sm ${activeTab === 'search' ? 'bg-purple-500 text-white shadow-[0_0_20px_rgba(168,85,247,0.3)]' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
                     >
                         <Search size={18} />
                         {t('musicfree.searchMusic')}
                     </button>
                     <button
                         onClick={() => setActiveTab('history')}
-                        className={`flex items-center gap-3 px-4 py-2.5 rounded-xl font-medium transition-all ${activeTab === 'history' ? 'bg-purple-500 text-white shadow-[0_0_20px_rgba(168,85,247,0.3)]' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
+                        className={`whitespace-nowrap flex items-center gap-2 md:gap-3 px-3 md:px-4 py-1.5 md:py-2.5 rounded-full md:rounded-xl font-medium transition-all text-sm ${activeTab === 'history' ? 'bg-purple-500 text-white shadow-[0_0_20px_rgba(168,85,247,0.3)]' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
                     >
                         <Clock size={18} />
                         {t('musicfree.playHistory')}
                     </button>
                     <button
                         onClick={() => setActiveTab('favorites')}
-                        className={`flex items-center gap-3 px-4 py-2.5 rounded-xl font-medium transition-all ${activeTab === 'favorites' ? 'bg-purple-500 text-white shadow-[0_0_20px_rgba(168,85,247,0.3)]' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
+                        className={`whitespace-nowrap flex items-center gap-2 md:gap-3 px-3 md:px-4 py-1.5 md:py-2.5 rounded-full md:rounded-xl font-medium transition-all text-sm ${activeTab === 'favorites' ? 'bg-purple-500 text-white shadow-[0_0_20px_rgba(168,85,247,0.3)]' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
                     >
                         <Heart size={18} />
                         {t('musicfree.favorites')}
                     </button>
                     <button
                         onClick={() => setActiveTab('playlists')}
-                        className={`flex items-center gap-3 px-4 py-2.5 rounded-xl font-medium transition-all ${activeTab === 'playlists' ? 'bg-purple-500 text-white shadow-[0_0_20px_rgba(168,85,247,0.3)]' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
+                        className={`whitespace-nowrap flex items-center gap-2 md:gap-3 px-3 md:px-4 py-1.5 md:py-2.5 rounded-full md:rounded-xl font-medium transition-all text-sm ${activeTab === 'playlists' ? 'bg-purple-500 text-white shadow-[0_0_20px_rgba(168,85,247,0.3)]' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
                     >
                         <ListMusic size={18} />
                         {t('musicfree.playlists')}
                     </button>
                 </div>
 
-                <div className="mt-4 px-3 mb-2">
+                <div className="md:mt-4 px-2 md:px-3 mb-2 shrink-0">
                     <div className="bg-orange-500/10 border border-orange-500/20 rounded-xl p-3 shadow-[0_4px_20px_rgba(249,115,22,0.05)]">
                         <div className="flex items-center gap-2 mb-2 flex-wrap">
                             <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-500/20 text-blue-400 border border-blue-500/30">
@@ -311,11 +311,11 @@ export const MusicFreeView: React.FC<{
                     </div>
                 </div>
 
-                <div className="h-px bg-white/10 my-2" />
+                <div className="hidden md:block h-px bg-white/10 my-2" />
 
                 <button
                     onClick={() => setActiveTab('plugins')}
-                    className={`flex items-center gap-3 px-4 py-2.5 rounded-xl font-medium transition-all ${activeTab === 'plugins' ? 'bg-blue-500 text-white shadow-[0_0_20px_rgba(59,130,246,0.3)]' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
+                    className={`whitespace-nowrap flex items-center gap-2 md:gap-3 px-3 md:px-4 py-1.5 md:py-2.5 rounded-full md:rounded-xl font-medium transition-all text-sm shrink-0 md:mb-0 mb-2 ${activeTab === 'plugins' ? 'bg-blue-500 text-white shadow-[0_0_20px_rgba(59,130,246,0.3)]' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
                 >
                     <Settings2 size={18} />
                     {t('pluginManager.title')}
@@ -323,7 +323,7 @@ export const MusicFreeView: React.FC<{
             </div>
 
             {/* Main Content */}
-            <div className="flex-1 flex flex-col overflow-hidden bg-black/20 p-8">
+            <div className="flex-1 min-h-0 flex flex-col overflow-hidden bg-black/20 p-4 md:p-8">
                 {activeTab === 'search' && (
                     <>
                         <div className="flex items-center justify-between mb-8">

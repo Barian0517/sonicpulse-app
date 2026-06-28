@@ -252,10 +252,10 @@ export const NeteaseView: React.FC<{
     };
 
     return (
-        <div className="flex h-full overflow-hidden">
-            {/* Sidebar */}
-            <div className="w-64 bg-white/5 border-r border-white/10 flex flex-col flex-shrink-0">
-                <div className="p-4">
+        <div className="flex flex-col md:flex-row h-full overflow-hidden">
+            {/* Sidebar / Top Nav */}
+            <div className="w-full h-auto md:w-64 bg-white/5 border-b md:border-b-0 md:border-r border-white/10 flex flex-col flex-shrink-0 z-10">
+                <div className="p-2 md:p-4 shrink-0">
                     <div className="relative">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
                         <input 
@@ -268,42 +268,45 @@ export const NeteaseView: React.FC<{
                     </div>
                 </div>
 
-                <div className="flex-1 overflow-y-auto custom-scrollbar">
-                    <div className="px-3 mb-6">
-                        <h3 className="px-3 text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">{t('netease.browse')}</h3>
-                        <button onClick={() => handleTabClick('explore')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === 'explore' ? 'bg-red-500/20 text-red-400' : 'hover:bg-white/5 text-gray-300'}`}>
+                <div className="flex flex-row md:flex-col overflow-x-auto md:overflow-y-auto custom-scrollbar md:flex-1 hide-scrollbar px-2 md:px-0 pb-2 md:pb-0 gap-2 md:gap-0 items-center md:items-stretch">
+                    <div className="flex md:block md:px-3 md:mb-6 shrink-0">
+                        <h3 className="hidden md:block px-3 text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">{t('netease.browse')}</h3>
+                        <button onClick={() => handleTabClick('explore')} className={`whitespace-nowrap flex items-center gap-2 md:gap-3 px-3 md:px-3 py-1.5 md:py-2 rounded-full md:rounded-lg text-sm font-medium transition-colors ${activeTab === 'explore' ? 'bg-red-500/20 text-red-400' : 'hover:bg-white/5 text-gray-300'}`}>
                             <Compass size={18} />
-                            {t('netease.dailyRecommendation')}
+                            <span className="hidden md:inline">{t('netease.dailyRecommendation')}</span>
+                            <span className="md:hidden">探索</span>
                         </button>
                     </div>
 
-                    <div className="px-3 mb-6">
-                        <h3 className="px-3 text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">{t('netease.myMusicLibrary')}</h3>
-                        <button onClick={() => handleTabClick('playlists')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === 'playlists' ? 'bg-red-500/20 text-red-400' : 'hover:bg-white/5 text-gray-300'}`}>
+                    <div className="flex md:block md:px-3 md:mb-6 shrink-0 gap-2 md:gap-0">
+                        <h3 className="hidden md:block px-3 text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">{t('netease.myMusicLibrary')}</h3>
+                        <button onClick={() => handleTabClick('playlists')} className={`whitespace-nowrap flex items-center gap-2 md:gap-3 px-3 md:px-3 py-1.5 md:py-2 rounded-full md:rounded-lg text-sm font-medium transition-colors ${activeTab === 'playlists' ? 'bg-red-500/20 text-red-400' : 'hover:bg-white/5 text-gray-300'}`}>
                             <ListMusic size={18} />
-                            {t('netease.myPlaylists')}
+                            <span className="hidden md:inline">{t('netease.myPlaylists')}</span>
+                            <span className="md:hidden">歌單</span>
                         </button>
-                        <button onClick={() => handleTabClick('favorites')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === 'favorites' ? 'bg-red-500/20 text-red-400' : 'hover:bg-white/5 text-gray-300'}`}>
+                        <button onClick={() => handleTabClick('favorites')} className={`whitespace-nowrap flex items-center gap-2 md:gap-3 px-3 md:px-3 py-1.5 md:py-2 rounded-full md:rounded-lg text-sm font-medium transition-colors ${activeTab === 'favorites' ? 'bg-red-500/20 text-red-400' : 'hover:bg-white/5 text-gray-300'}`}>
                             <Heart size={18} />
-                            {t('netease.myFavorites')}
+                            <span className="hidden md:inline">{t('netease.myFavorites')}</span>
+                            <span className="md:hidden">我的最愛</span>
                         </button>
                     </div>
                     
-                    <div className="px-3 mb-6 mt-auto pt-6">
+                    <div className="flex md:block md:px-3 md:mb-6 md:mt-auto md:pt-6 shrink-0 ml-auto md:ml-0">
                         {!isLoggedIn ? (
-                            <button onClick={() => handleTabClick('login')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === 'login' ? 'bg-red-500/20 text-red-400' : 'hover:bg-white/5 text-gray-300'}`}>
+                            <button onClick={() => handleTabClick('login')} className={`whitespace-nowrap flex items-center gap-2 md:gap-3 px-3 md:px-3 py-1.5 md:py-2 rounded-full md:rounded-lg text-sm font-medium transition-colors ${activeTab === 'login' ? 'bg-red-500/20 text-red-400' : 'hover:bg-white/5 text-gray-300'}`}>
                                 <QrCode size={18} />
                                 {t('netease.login')}
                             </button>
                         ) : (
-                            <button onClick={handleLogout} className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium transition-colors hover:bg-white/5 text-gray-300 group">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-6 h-6 rounded-full bg-red-500/20 flex items-center justify-center">
-                                        <span className="text-red-400 text-xs">Me</span>
+                            <button onClick={handleLogout} className="whitespace-nowrap flex items-center justify-between px-3 md:px-3 py-1.5 md:py-2 rounded-full md:rounded-lg text-sm font-medium transition-colors hover:bg-white/5 text-gray-300 group">
+                                <div className="flex items-center gap-2 md:gap-3">
+                                    <div className="w-5 h-5 md:w-6 md:h-6 rounded-full bg-red-500/20 flex items-center justify-center">
+                                        <span className="text-red-400 text-[10px] md:text-xs">Me</span>
                                     </div>
-                                    <span>{t('netease.loggedIn')}</span>
+                                    <span className="hidden md:inline">{t('netease.loggedIn')}</span>
                                 </div>
-                                <span className="text-xs text-gray-500 opacity-0 group-hover:opacity-100">{t('netease.logout')}</span>
+                                <span className="hidden md:inline text-xs text-gray-500 opacity-0 group-hover:opacity-100">{t('netease.logout')}</span>
                             </button>
                         )}
                     </div>
@@ -311,7 +314,7 @@ export const NeteaseView: React.FC<{
             </div>
 
             {/* Main Content Area */}
-            <div className="flex-1 overflow-y-auto custom-scrollbar bg-black/20">
+            <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar bg-black/20">
                 {searchQuery ? (
                     <div className="p-8">
                         <h2 className="text-2xl font-bold mb-6">{t('netease.searchResultsFor', { query: searchQuery })}</h2>

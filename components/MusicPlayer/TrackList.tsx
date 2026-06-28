@@ -190,15 +190,15 @@ export const TrackList: React.FC<{
                         
                         <div className="flex-1 min-w-0">
                             <div className={`font-bold text-sm truncate ${isCurrent ? 'text-purple-300' : 'text-white'}`}>{track.title}</div>
-                            <div className="flex items-center gap-2">
-                                <span className="text-xs text-gray-500 truncate">{track.artist}</span>
-                                {track.format && <span className="text-[9px] uppercase bg-white/10 px-1.5 py-0.5 rounded text-gray-400">{track.format}</span>}
-                                {track.bitrate && <span className="text-[9px] uppercase bg-white/10 px-1.5 py-0.5 rounded text-gray-400">{track.bitrate} kbps</span>}
+                            <div className="flex items-center gap-1 md:gap-2">
+                                <span className="text-[10px] md:text-xs text-gray-500 truncate">{track.artist}</span>
+                                {track.format && <span className="text-[9px] uppercase bg-white/10 px-1 md:px-1.5 py-0.5 rounded text-gray-400 hidden sm:inline-block">{track.format}</span>}
+                                {track.bitrate && <span className="text-[9px] uppercase bg-white/10 px-1 md:px-1.5 py-0.5 rounded text-gray-400 hidden sm:inline-block">{track.bitrate} kbps</span>}
                             </div>
                         </div>
 
                         {/* Interactive Actions */}
-                        <div className="flex items-center gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="hidden md:flex items-center gap-3 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
                             {/* 5-Star Rating (Hover to reveal full 5 stars, otherwise show average/current if rated, but here we just show an interactive 5-star row) */}
                             <div className="flex items-center gap-0.5">
                                 {[1,2,3,4,5].map(r => (
@@ -213,20 +213,20 @@ export const TrackList: React.FC<{
                         </div>
 
                         {/* Always visible actions or indicators */}
-                        <div className="flex items-center gap-3 shrink-0">
-                            <button onClick={(e) => handleToggleStar(e, track)} className={`hover:scale-110 transition-transform ${isStarred ? 'text-red-500' : 'text-gray-600 hover:text-white'}`} title={isStarred ? t('player.cancelLike') : t('player.addLike')}>
+                        <div className="flex items-center gap-1 md:gap-3 shrink-0">
+                            <button onClick={(e) => handleToggleStar(e, track)} className={`p-1.5 md:p-0 hover:scale-110 transition-transform ${isStarred ? 'text-red-500' : 'text-gray-600 hover:text-white'}`} title={isStarred ? t('player.cancelLike') : t('player.addLike')}>
                                 <Heart size={16} fill={isStarred ? "currentColor" : "none"} />
                             </button>
 
-                            <button onClick={(e) => handleDownload(e, track)} className={`hover:scale-110 transition-transform ${isDownloaded ? 'text-green-500' : isDownloading ? 'text-blue-400 animate-bounce' : 'text-gray-600 hover:text-white'}`} title={isDownloaded ? t('player.downloaded') : t('player.downloadForOffline')}>
+                            <button onClick={(e) => handleDownload(e, track)} className={`p-1.5 md:p-0 hidden sm:block hover:scale-110 transition-transform ${isDownloaded ? 'text-green-500' : isDownloading ? 'text-blue-400 animate-bounce' : 'text-gray-600 hover:text-white'}`} title={isDownloaded ? t('player.downloaded') : t('player.downloadForOffline')}>
                                 {isDownloaded ? <CheckCircle2 size={16} /> : <DownloadCloud size={16} />}
                             </button>
                             
-                            <button onClick={(e) => handleContextMenu(e, track)} className="text-gray-600 hover:text-white hover:scale-110 transition-transform p-1">
-                                <MoreHorizontal size={16} />
+                            <button onClick={(e) => handleContextMenu(e, track)} className="text-gray-600 hover:text-white hover:scale-110 transition-transform p-1.5 md:p-1">
+                                <MoreHorizontal className="w-[18px] h-[18px] md:w-4 md:h-4" />
                             </button>
 
-                            <div className="text-xs text-gray-500 w-12 text-right">
+                            <div className="text-xs text-gray-500 w-12 text-right hidden sm:block">
                                 {formatTime(track.duration)}
                             </div>
                         </div>

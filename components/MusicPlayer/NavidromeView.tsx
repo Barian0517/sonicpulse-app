@@ -160,25 +160,31 @@ export const NavidromeView: React.FC<{
     }, [activeTab]);
 
     return (
-        <div className="flex h-full w-full bg-transparent text-white rounded-tl-2xl overflow-hidden relative">
+        <div className="flex flex-col md:flex-row h-full w-full bg-transparent text-white rounded-tl-2xl overflow-hidden relative">
             {/* Inner Sidebar for Navidrome */}
-            <div className="w-56 bg-[#050508]/40 backdrop-blur-xl border-r border-white/10 flex flex-col p-5 gap-2 relative z-10 shadow-[4px_0_24px_rgba(0,0,0,0.2)]">
-                <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-4 px-2">{t('navidrome.library')}</h3>
+            <div className="w-full h-auto md:w-56 bg-[#050508]/40 backdrop-blur-xl border-b md:border-b-0 md:border-r border-white/10 flex flex-row md:flex-col overflow-x-auto md:overflow-y-auto p-2 md:p-5 gap-2 md:gap-2 relative z-10 shadow-[4px_0_24px_rgba(0,0,0,0.2)] hide-scrollbar shrink-0 items-center md:items-stretch">
+                <div className="flex items-center md:block shrink-0 gap-2 md:gap-0">
+                    <h3 className="hidden md:block text-xs font-bold text-gray-500 uppercase tracking-wider mb-4 px-2">{t('navidrome.library')}</h3>
+                    
+                    <NavButton active={activeTab === 'explore' && !selectedAlbum && !selectedArtist} onClick={() => handleTabClick('explore')} icon={<Compass size={18} />} label={t('navidrome.explore')} />
+                    <NavButton active={activeTab === 'favorites' && !selectedAlbum && !selectedArtist} onClick={() => handleTabClick('favorites')} icon={<Heart size={18} />} label={t('navidrome.favorites')} />
+                    <NavButton active={activeTab === 'playlists' && !selectedAlbum && !selectedArtist} onClick={() => handleTabClick('playlists')} icon={<ListMusic size={18} />} label={t('navidrome.playlists')} />
+                </div>
                 
-                <NavButton active={activeTab === 'explore' && !selectedAlbum && !selectedArtist} onClick={() => handleTabClick('explore')} icon={<Compass size={18} />} label={t('navidrome.explore')} />
-                <NavButton active={activeTab === 'favorites' && !selectedAlbum && !selectedArtist} onClick={() => handleTabClick('favorites')} icon={<Heart size={18} />} label={t('navidrome.favorites')} />
-                <NavButton active={activeTab === 'playlists' && !selectedAlbum && !selectedArtist} onClick={() => handleTabClick('playlists')} icon={<ListMusic size={18} />} label={t('navidrome.playlists')} />
+                <div className="flex items-center md:block shrink-0 gap-2 md:gap-0">
+                    <h3 className="hidden md:block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 md:mt-6 px-2">{t('navidrome.music')}</h3>
+                    <NavButton active={activeTab === 'albums' && !selectedAlbum && !selectedArtist} onClick={() => handleTabClick('albums')} icon={<Disc3 size={18} />} label={t('navidrome.albums')} />
+                    <NavButton active={activeTab === 'artists' && !selectedArtist && !selectedArtist} onClick={() => handleTabClick('artists')} icon={<Mic2 size={18} />} label={t('navidrome.artists')} />
+                </div>
                 
-                <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 mt-6 px-2">{t('navidrome.music')}</h3>
-                <NavButton active={activeTab === 'albums' && !selectedAlbum && !selectedArtist} onClick={() => handleTabClick('albums')} icon={<Disc3 size={18} />} label={t('navidrome.albums')} />
-                <NavButton active={activeTab === 'artists' && !selectedAlbum && !selectedArtist} onClick={() => handleTabClick('artists')} icon={<Mic2 size={18} />} label={t('navidrome.artists')} />
-                
-                <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 mt-6 px-2">{t('navidrome.offline')}</h3>
-                <NavButton active={activeTab === 'downloads' && !selectedAlbum && !selectedArtist} onClick={() => handleTabClick('downloads')} icon={<DownloadCloud size={18} />} label={t('navidrome.downloads')} />
+                <div className="flex items-center md:block shrink-0 gap-2 md:gap-0">
+                    <h3 className="hidden md:block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 md:mt-6 px-2">{t('navidrome.offline')}</h3>
+                    <NavButton active={activeTab === 'downloads' && !selectedAlbum && !selectedArtist} onClick={() => handleTabClick('downloads')} icon={<DownloadCloud size={18} />} label={t('navidrome.downloads')} />
+                </div>
             </div>
 
             {/* Main Content Area */}
-            <div className="flex-1 overflow-y-auto custom-scrollbar p-6 relative flex flex-col">
+            <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar p-6 relative flex flex-col">
                 {/* Search Bar */}
                 <div className="mb-6 shrink-0">
                     <div className="relative w-96">
@@ -463,11 +469,11 @@ export const NavidromeView: React.FC<{
 const NavButton: React.FC<{ active: boolean; onClick: () => void; icon: React.ReactNode; label: string }> = ({ active, onClick, icon, label }) => (
     <button 
         onClick={onClick}
-        className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-300 text-sm font-medium border ${
-            active ? 'bg-purple-500/20 text-purple-200 border-purple-500/30 shadow-[0_0_15px_rgba(168,85,247,0.15)] translate-x-1' : 'bg-transparent text-gray-400 border-transparent hover:text-white hover:bg-white/5 hover:border-white/10'
+        className={`whitespace-nowrap flex items-center gap-2 md:gap-3 px-3 md:px-4 py-2 md:py-2.5 rounded-full md:rounded-xl transition-all duration-300 text-xs md:text-sm font-medium border ${
+            active ? 'bg-purple-500/20 text-purple-200 border-purple-500/30 shadow-[0_0_15px_rgba(168,85,247,0.15)] md:translate-x-1' : 'bg-transparent text-gray-400 border-transparent hover:text-white hover:bg-white/5 hover:border-white/10'
         }`}
     >
         {icon}
-        {label}
+        <span className="hidden md:inline">{label}</span>
     </button>
 );

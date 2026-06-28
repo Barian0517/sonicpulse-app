@@ -276,58 +276,67 @@ export const JukeboxApp: React.FC = () => {
     };
 
     return (
-        <div className="h-screen bg-[#0a0a0f] text-white flex overflow-hidden font-sans">
-            {/* Sidebar */}
-            <div className="w-16 md:w-64 bg-[#12121c] border-r border-white/5 flex flex-col z-20 shrink-0 transition-all duration-300">
-                <div className="h-16 flex items-center justify-center md:justify-start md:px-6 shrink-0 border-b border-white/5">
-                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center shadow-lg shadow-purple-500/20 shrink-0">
-                        <Play fill="white" size={16} className="ml-1" />
+        <div className="h-screen bg-[#0a0a0f] text-white flex flex-col md:flex-row overflow-hidden font-sans">
+            {/* Sidebar / Top Nav */}
+            <div className="w-full h-auto md:w-64 md:h-full bg-[#12121c] border-b md:border-b-0 md:border-r border-white/5 flex flex-col z-20 shrink-0 transition-all duration-300">
+                <div className="h-14 md:h-16 flex items-center justify-between md:justify-start px-4 md:px-6 shrink-0 border-b border-white/5">
+                    <div className="flex items-center">
+                        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center shadow-lg shadow-purple-500/20 shrink-0">
+                            <Play fill="white" size={16} className="ml-1" />
+                        </div>
+                        <span className="ml-3 font-bold text-lg tracking-wide bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400">SonicPulse</span>
                     </div>
-                    <span className="ml-3 font-bold text-lg hidden md:block tracking-wide bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400">SonicPulse</span>
+                    {/* Mobile Settings Button */}
+                    <button onClick={() => setIsSettingsOpen(true)} className="md:hidden text-gray-400 hover:text-white p-2">
+                        <Settings size={20} />
+                    </button>
                 </div>
                 
-                <div className="flex-1 overflow-y-auto py-4 custom-scrollbar flex flex-col gap-1 px-2 md:px-4">
+                <div className="w-full overflow-x-auto md:flex-1 md:overflow-y-auto py-2 md:py-4 custom-scrollbar flex flex-row md:flex-col gap-2 md:gap-1 px-2 md:px-4 hide-scrollbar">
                     {hostState.permissions.allowedSources.map(source => (
                         <button
                             key={source}
                             onClick={() => { setActiveSource(source); setSearchResults([]); setSearchQuery(''); }}
-                            className={`flex items-center gap-3 p-3 rounded-xl transition-all group ${
+                            className={`flex items-center justify-center md:justify-start gap-2 md:gap-3 p-2 md:p-3 rounded-xl transition-all whitespace-nowrap group ${
                                 activeSource === source 
                                     ? 'bg-gradient-to-r from-purple-500/20 to-transparent text-purple-400 font-bold relative overflow-hidden' 
                                     : 'text-gray-400 hover:text-white hover:bg-white/5'
                             }`}
                         >
                             {activeSource === source && (
-                                <div className="absolute left-0 top-0 bottom-0 w-1 bg-purple-500 shadow-[0_0_10px_rgba(168,85,247,0.5)]"></div>
+                                <div className="hidden md:block absolute left-0 top-0 bottom-0 w-1 bg-purple-500 shadow-[0_0_10px_rgba(168,85,247,0.5)]"></div>
+                            )}
+                            {activeSource === source && (
+                                <div className="md:hidden absolute bottom-0 left-0 right-0 h-1 bg-purple-500 shadow-[0_0_10px_rgba(168,85,247,0.5)]"></div>
                             )}
                             <div className={`${activeSource === source ? 'text-purple-400' : 'text-gray-500 group-hover:text-gray-300'} transition-colors`}>
                                 {renderSourceIcon(source)}
                             </div>
-                            <span className="hidden md:block truncate">{renderSourceName(source)}</span>
+                            <span>{renderSourceName(source)}</span>
                         </button>
                     ))}
                     
-                    {/* Settings Button */}
-                    <div className="mt-auto">
+                    {/* Desktop Settings Button */}
+                    <div className="mt-auto hidden md:block pt-4">
                         <button
                             onClick={() => setIsSettingsOpen(true)}
                             className="w-full flex items-center gap-3 p-3 rounded-xl text-gray-400 hover:text-white hover:bg-white/5 transition-all group"
                         >
                             <Settings size={20} className="text-gray-500 group-hover:text-gray-300 transition-colors" />
-                            <span className="hidden md:block">點歌機設定</span>
+                            <span>點歌機設定</span>
                         </button>
                     </div>
                 </div>
             </div>
 
             {/* Main Content */}
-            <div className="flex-1 flex flex-col min-w-0 relative pb-24">
+            <div className="flex-1 flex flex-col min-w-0 min-h-0 relative pb-16 md:pb-24">
                 {/* Search Bar - only show if not in personal mode full view */}
                 {!hostState.permissions.personalMode && (
-                    <div className="p-4 md:p-8 shrink-0 relative z-10 flex items-center gap-4">
-                        <div className="flex-1 relative group max-w-2xl mx-auto">
-                            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                                <Search size={20} className="text-gray-400 group-focus-within:text-purple-400 transition-colors" />
+                    <div className="p-3 md:p-8 shrink-0 relative z-10 flex flex-row items-center gap-2 md:gap-4">
+                        <div className="flex-1 relative group w-full max-w-2xl mx-auto md:mx-0 md:ml-auto">
+                            <div className="absolute inset-y-0 left-0 pl-3 md:pl-4 flex items-center pointer-events-none">
+                                <Search size={18} className="text-gray-400 group-focus-within:text-purple-400 transition-colors md:w-5 md:h-5" />
                             </div>
                             <input 
                                 type="text" 
@@ -335,14 +344,15 @@ export const JukeboxApp: React.FC = () => {
                                 onChange={e => setSearchQuery(e.target.value)}
                                 onKeyDown={e => e.key === 'Enter' && handleSearch()}
                                 placeholder={`在 ${renderSourceName(activeSource)} 中搜尋...`}
-                                className="w-full bg-white/5 border border-white/10 rounded-full py-3 md:py-4 pl-12 pr-4 text-white focus:outline-none focus:border-purple-500/50 focus:bg-white/10 transition-all shadow-inner"
+                                className="w-full bg-white/5 border border-white/10 rounded-full py-2.5 md:py-4 pl-10 md:pl-12 pr-4 text-sm md:text-base text-white focus:outline-none focus:border-purple-500/50 focus:bg-white/10 transition-all shadow-inner"
                             />
                         </div>
                         <button 
                             onClick={handleSearch}
-                            className="bg-purple-600 hover:bg-purple-500 text-white px-6 md:px-8 py-3 md:py-4 rounded-full font-bold transition-all shadow-[0_0_20px_rgba(168,85,247,0.3)] hover:shadow-[0_0_30px_rgba(168,85,247,0.5)] whitespace-nowrap"
+                            className="bg-purple-600 hover:bg-purple-500 text-white px-4 md:px-8 py-2.5 md:py-4 rounded-full font-bold transition-all shadow-[0_0_20px_rgba(168,85,247,0.3)] hover:shadow-[0_0_30px_rgba(168,85,247,0.5)] whitespace-nowrap shrink-0 md:mr-auto"
                         >
-                            搜尋
+                            <span className="hidden md:inline">搜尋</span>
+                            <Search size={18} className="md:hidden" />
                         </button>
                     </div>
                 )}
@@ -430,9 +440,75 @@ export const JukeboxApp: React.FC = () => {
                 )}
             </div>
 
+            {/* Bottom Player */}
+            <div className="absolute bottom-0 left-0 right-0 h-16 md:h-24 bg-[#0a0a0f]/80 backdrop-blur-3xl border-t border-white/10 shadow-[0_-10px_40px_rgba(0,0,0,0.5)] flex items-center px-2 md:px-8 gap-2 md:gap-8 z-50">
+                {/* Left: Track Info */}
+                <div className="flex items-center gap-2 md:gap-4 flex-1 md:w-1/3 min-w-0 shrink">
+                    <div className="w-10 h-10 md:w-14 md:h-14 bg-white/10 rounded-lg md:rounded-xl overflow-hidden shadow-md shrink-0 flex items-center justify-center">
+                        {hostState.currentTrack?.coverUrl ? (
+                            <img src={hostState.currentTrack.coverUrl} className="w-full h-full object-cover" />
+                        ) : (
+                            <Music2 size={24} className="text-gray-600" />
+                        )}
+                    </div>
+                    <div className="min-w-0 flex-1 pr-1 md:pr-2">
+                        <h4 className="font-bold text-xs md:text-sm text-white truncate">{hostState.currentTrack?.title || "沒有正在播放的歌曲"}</h4>
+                        <p className="text-[10px] md:text-xs text-gray-400 truncate">{hostState.currentTrack?.artist || "-"}</p>
+                    </div>
+                </div>
+                
+                {/* Middle: Controls */}
+                <div className="shrink-0 md:flex-1 flex flex-col items-center gap-2">
+                    <div className="flex items-center gap-3 md:gap-6">
+                        <button onClick={() => handleControl('prev')} disabled={!hostState.permissions.allowControl} className="text-gray-500 hover:text-white transition-colors disabled:opacity-30"><SkipBack size={18} fill="currentColor" className="md:w-5 md:h-5" /></button>
+                        <button onClick={() => handleControl('toggle_play')} disabled={!hostState.permissions.allowControl} className="w-8 h-8 md:w-10 md:h-10 bg-white text-black rounded-full flex items-center justify-center hover:scale-105 transition-transform shadow-lg disabled:opacity-50">
+                            {hostState.isPlaying ? <Pause size={16} fill="currentColor" className="md:w-5 md:h-5" /> : <Play size={16} fill="currentColor" className="ml-1 md:w-5 md:h-5" />}
+                        </button>
+                        <button onClick={() => handleControl('next')} disabled={!hostState.permissions.allowControl} className="text-gray-500 hover:text-white transition-colors disabled:opacity-30"><SkipForward size={18} fill="currentColor" className="md:w-5 md:h-5" /></button>
+                    </div>
+                    <div className="w-full max-w-md flex items-center gap-3 text-[10px] text-gray-400 font-mono hidden md:flex">
+                        <span className="w-8 text-right">{formatTime(hostState.progress)}</span>
+                        <div className="flex-1 h-3 flex items-center">
+                            <div className="w-full bg-white/10 rounded-full h-1">
+                                <div className="h-full bg-purple-500 shadow-[0_0_10px_rgba(168,85,247,0.5)]" style={{ width: `${hostState.duration ? (hostState.progress / hostState.duration) * 100 : 0}%` }}></div>
+                            </div>
+                        </div>
+                        <span className="w-8">{formatTime(hostState.duration)}</span>
+                    </div>
+                </div>
+
+                {/* Right: Actions */}
+                <div className="shrink-0 md:w-1/3 flex justify-end items-center gap-2 md:gap-4">
+                    {hostState.currentTrack && hostState.permissions.personalMode && (
+                        <button 
+                            onClick={() => socket?.emit('client_command', { type: 'toggle_heart', trackId: hostState.currentTrack?.id })}
+                            className="p-1.5 md:p-2 transition-colors active:scale-95 text-gray-500 hover:text-white"
+                            title="切換紅心"
+                        >
+                            <Heart size={18} className="md:w-5 md:h-5" />
+                        </button>
+                    )}
+                    <button 
+                        onClick={() => socket?.emit('client_command', { type: 'toggle_roaming' })}
+                        className={`p-1.5 md:p-2 transition-colors hidden sm:block ${hostState.permissions.allowControl ? 'hover:text-white text-gray-400' : 'opacity-30 text-gray-500'}`}
+                        disabled={!hostState.permissions.allowControl}
+                        title="開啟/關閉主機漫遊"
+                    >
+                        <Compass size={18} className="md:w-5 md:h-5" />
+                    </button>
+                    <button 
+                        onClick={() => setIsQueueOpen(!isQueueOpen)}
+                        className={`p-1.5 md:p-2 transition-colors ${isQueueOpen ? 'text-purple-400' : 'text-gray-400 hover:text-white'}`}
+                        title="播放序列"
+                    >
+                        <ListVideo size={18} className="md:w-5 md:h-5" />
+                    </button>
+                </div>
+            </div>
+
             {/* Queue Panel Overlay */}
             {isQueueOpen && (
-                <div className="absolute top-0 right-0 bottom-24 w-80 bg-[#12121c]/95 backdrop-blur-3xl border-l border-white/10 shadow-[-20px_0_50px_rgba(0,0,0,0.5)] flex flex-col z-40 animate-in slide-in-from-right duration-300">
+                <div className="absolute top-0 right-0 bottom-16 md:bottom-24 w-full sm:w-80 bg-[#12121c]/95 backdrop-blur-3xl border-l border-white/10 shadow-[-20px_0_50px_rgba(0,0,0,0.5)] flex flex-col z-40 animate-in slide-in-from-right duration-300">
                     <div className="p-4 border-b border-white/10 flex justify-between items-center">
                         <h3 className="font-bold flex items-center gap-2"><ListVideo size={18} className="text-purple-400"/> 播放序列 ({hostState.queue.length})</h3>
                         <div className="flex gap-2">
@@ -471,68 +547,6 @@ export const JukeboxApp: React.FC = () => {
                 </div>
             )}
 
-            {/* Bottom Player */}
-            <div className="absolute bottom-0 left-0 right-0 h-24 bg-[#0a0a0f]/60 backdrop-blur-2xl border-t border-white/10 shadow-[0_-10px_40px_rgba(0,0,0,0.5)] flex items-center px-4 md:px-8 gap-4 md:gap-8 z-50">
-                <div className="flex items-center gap-4 w-1/3 shrink-0 min-w-0">
-                    <div className="w-14 h-14 bg-white/10 rounded-xl overflow-hidden shadow-md shrink-0 flex items-center justify-center">
-                        {hostState.currentTrack?.coverUrl ? (
-                            <img src={hostState.currentTrack.coverUrl} className="w-full h-full object-cover" />
-                        ) : (
-                            <Music2 size={24} className="text-gray-600" />
-                        )}
-                    </div>
-                    <div className="min-w-0 flex-1 pr-2 hidden sm:block">
-                        <h4 className="font-bold text-sm text-white truncate">{hostState.currentTrack?.title || "沒有正在播放的歌曲"}</h4>
-                        <p className="text-xs text-gray-400 truncate">{hostState.currentTrack?.artist || "-"}</p>
-                    </div>
-                    {hostState.currentTrack && hostState.permissions.personalMode && (
-                        <button 
-                            onClick={() => socket?.emit('client_command', { type: 'toggle_heart', trackId: hostState.currentTrack?.id })}
-                            className="p-2 transition-colors active:scale-95 text-gray-500 hover:text-white"
-                            title="切換紅心"
-                        >
-                            <Heart size={20} />
-                        </button>
-                    )}
-                </div>
-                
-                <div className="flex-1 flex flex-col items-center gap-2">
-                    <div className="flex items-center gap-6">
-                        <button onClick={() => handleControl('prev')} disabled={!hostState.permissions.allowControl} className="text-gray-500 hover:text-white transition-colors disabled:opacity-30"><SkipBack size={20} fill="currentColor" /></button>
-                        <button onClick={() => handleControl('toggle_play')} disabled={!hostState.permissions.allowControl} className="w-10 h-10 bg-white text-black rounded-full flex items-center justify-center hover:scale-105 transition-transform shadow-lg disabled:opacity-50">
-                            {hostState.isPlaying ? <Pause size={20} fill="currentColor" /> : <Play size={20} fill="currentColor" className="ml-1" />}
-                        </button>
-                        <button onClick={() => handleControl('next')} disabled={!hostState.permissions.allowControl} className="text-gray-500 hover:text-white transition-colors disabled:opacity-30"><SkipForward size={20} fill="currentColor" /></button>
-                    </div>
-                    <div className="w-full max-w-md flex items-center gap-3 text-[10px] text-gray-400 font-mono hidden md:flex">
-                        <span className="w-8 text-right">{formatTime(hostState.progress)}</span>
-                        <div className="flex-1 h-3 flex items-center">
-                            <div className="w-full bg-white/10 rounded-full h-1">
-                                <div className="h-full bg-purple-500 shadow-[0_0_10px_rgba(168,85,247,0.5)]" style={{ width: `${hostState.duration ? (hostState.progress / hostState.duration) * 100 : 0}%` }}></div>
-                            </div>
-                        </div>
-                        <span className="w-8">{formatTime(hostState.duration)}</span>
-                    </div>
-                </div>
-
-                <div className="w-1/3 flex justify-end items-center shrink-0 gap-4">
-                    <button 
-                        onClick={() => socket?.emit('client_command', { type: 'toggle_roaming' })}
-                        className={`p-2 transition-colors ${hostState.permissions.allowControl ? 'hover:text-white text-gray-400' : 'opacity-30 text-gray-500'}`}
-                        disabled={!hostState.permissions.allowControl}
-                        title="開啟/關閉主機漫遊"
-                    >
-                        <Compass size={20} />
-                    </button>
-                    <button 
-                        onClick={() => setIsQueueOpen(!isQueueOpen)}
-                        className={`p-2 transition-colors ${isQueueOpen ? 'text-purple-400' : 'text-gray-400 hover:text-white'}`}
-                        title="播放序列"
-                    >
-                        <ListVideo size={20} />
-                    </button>
-                </div>
-            </div>
 
             {/* Settings Modal (Simplified, no playback settings here since host handles it) */}
             {isSettingsOpen && (
