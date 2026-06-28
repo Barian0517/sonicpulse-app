@@ -401,6 +401,11 @@ app.post('/jukebox/configure', (req, res) => {
                 lastHostState = state;
                 socket.broadcast.emit('state_update', state);
             });
+
+            // Route personal data from host to web clients
+            socket.on('personal_data', (data) => {
+                socket.broadcast.emit('personal_data', data);
+            });
         });
 
         try {
