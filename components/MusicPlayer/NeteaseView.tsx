@@ -9,6 +9,7 @@ import { ExplorePage } from './ExplorePage';
 import { AlbumDetailsView } from './AlbumDetailsView';
 import { ArtistDetailsView } from './ArtistDetailsView';
 import { PlaylistDetailsView } from './PlaylistDetailsView';
+import { useTranslation } from '../../providers/I18nProvider';
 
 type NavTab = 'explore' | 'artists' | 'albums' | 'playlists' | 'favorites' | 'login';
 
@@ -23,6 +24,7 @@ export const NeteaseView: React.FC<{
 }> = ({ provider, onPlayTrack, onPlayNow, onPlayNext, onAddToQueue, currentTrackId, isPlaying }) => {
     const [activeTab, setActiveTab] = useState<NavTab>('explore');
     const [isLoading, setIsLoading] = useState(false);
+    const { t } = useTranslation();
 
     // States for different views
     const [playlists, setPlaylists] = useState<Playlist[]>([]);
@@ -85,10 +87,10 @@ export const NeteaseView: React.FC<{
         try {
             const pl = await provider.createPlaylist(name);
             setPlaylists(prev => [pl, ...prev]);
-            window.dispatchEvent(new CustomEvent('sonicpulse-toast', { detail: "歌單建立成功" }));
+            window.dispatchEvent(new CustomEvent('sonicpulse-toast', { detail: t('netease.playlistCreated') }));
         } catch (e: any) {
             console.error(e);
-            window.dispatchEvent(new CustomEvent('sonicpulse-toast', { detail: "建立歌單失敗: " + e.message }));
+            window.dispatchEvent(new CustomEvent('sonicpulse-toast', { detail: t('netease.createPlaylistFailed') + e.message }));
         }
     };
 
@@ -96,10 +98,10 @@ export const NeteaseView: React.FC<{
         try {
             await provider.deletePlaylist(id);
             setPlaylists(prev => prev.filter(p => p.id !== id));
-            window.dispatchEvent(new CustomEvent('sonicpulse-toast', { detail: "歌單已刪除" }));
+            window.dispatchEvent(new CustomEvent('sonicpulse-toast', { detail: t('netease.playlistDeleted') }));
         } catch (e: any) {
             console.error(e);
-            window.dispatchEvent(new CustomEvent('sonicpulse-toast', { detail: "刪除歌單失敗: " + e.message }));
+            window.dispatchEvent(new CustomEvent('sonicpulse-toast', { detail: t('netease.deletePlaylistFailed') + e.message }));
         }
     };
 
@@ -139,26 +141,26 @@ export const NeteaseView: React.FC<{
 
     const startLoginFlow = async () => {
         try {
-            setQrStatus('正在產生 QR 碼...');
+            setQrStatus(t('netease.generatingQr'));
             const key = await provider.getLoginQrKey();
             setQrKey(key);
             const img = await provider.getLoginQrImage(key);
             setQrImage(img);
-            setQrStatus('請使用網易雲音樂 App 掃描 QR 碼');
+            setQrStatus(t('netease.scanQrPrompt'));
         } catch (e) {
             console.error(e);
-            setQrStatus('無法產生 QR 碼');
+            setQrStatus(t('netease.generateQrFailed'));
         }
     };
 
     const startWebLogin = async () => {
-        setQrStatus('請在新視窗中登入網易雲音樂...');
+        setQrStatus(t('netease.webLoginPrompt'));
         setQrImage('');
         
         try {
             const webview = new WebviewWindow('netease-login', {
                 url: 'https://music.163.com/#/login',
-                title: '網易雲音樂登入',
+                title: t('netease.webLoginTitle'),
                 width: 800,
                 height: 600,
             });
@@ -175,7 +177,7 @@ export const NeteaseView: React.FC<{
                             const cookieString = cookies.join('; ');
                             localStorage.setItem('netease_cookie', cookieString);
                             provider.setCookie(cookieString);
-                            setQrStatus('網頁登入成功！');
+                            setQrStatus(t('netease.loginSuccess'));
                             setIsLoggedIn(true);
                             
                             const status = await provider.getLoginStatus();
@@ -193,18 +195,18 @@ export const NeteaseView: React.FC<{
                 webview.onCloseRequested(() => {
                     clearInterval(pollInterval);
                     if (!localStorage.getItem('netease_cookie')) {
-                        setQrStatus('登入視窗已關閉，未登入。');
+                        setQrStatus(t('netease.loginCancelled'));
                     }
                 });
             });
 
             webview.once('tauri://error', (e) => {
                 console.error(e);
-                setQrStatus('無法開啟登入視窗');
+                setQrStatus(t('netease.openWindowFailed'));
             });
         } catch (e) {
             console.error(e);
-            setQrStatus('開啟視窗失敗');
+            setQrStatus(t('netease.openWindowFailed'));
         }
     };
 
@@ -214,12 +216,12 @@ export const NeteaseView: React.FC<{
                 try {
                     const res = await provider.checkLoginQr(qrKey);
                     if (res.code === 800) {
-                        setQrStatus('QR 碼已過期，請重新整理。');
+                        setQrStatus(t('netease.qrExpired'));
                         clearInterval(interval);
                     } else if (res.code === 802) {
-                        setQrStatus('等待手機確認中...');
+                        setQrStatus(t('netease.waitingConfirm'));
                     } else if (res.code === 803) {
-                        setQrStatus('登入成功！');
+                        setQrStatus(t('netease.loginSuccess'));
                         clearInterval(interval);
                         if (res.cookie) {
                             localStorage.setItem('netease_cookie', res.cookie);
@@ -246,7 +248,7 @@ export const NeteaseView: React.FC<{
         provider.setCookie('');
         setIsLoggedIn(false);
         setActiveTab('login');
-        window.dispatchEvent(new CustomEvent('sonicpulse-toast', { detail: "已登出網易雲音樂" }));
+        window.dispatchEvent(new CustomEvent('sonicpulse-toast', { detail: t('netease.logoutSuccess') }));
     };
 
     return (
@@ -258,7 +260,7 @@ export const NeteaseView: React.FC<{
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
                         <input 
                             type="text" 
-                            placeholder="搜尋網易雲音樂..." 
+                            placeholder={t('netease.searchPlaceholder')} 
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                             className="w-full bg-white/5 border border-white/10 rounded-full py-2 pl-10 pr-4 text-sm focus:outline-none focus:border-red-500/50 transition-colors"
@@ -268,22 +270,22 @@ export const NeteaseView: React.FC<{
 
                 <div className="flex-1 overflow-y-auto custom-scrollbar">
                     <div className="px-3 mb-6">
-                        <h3 className="px-3 text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">瀏覽</h3>
+                        <h3 className="px-3 text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">{t('netease.browse')}</h3>
                         <button onClick={() => handleTabClick('explore')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === 'explore' ? 'bg-red-500/20 text-red-400' : 'hover:bg-white/5 text-gray-300'}`}>
                             <Compass size={18} />
-                            每日推薦
+                            {t('netease.dailyRecommendation')}
                         </button>
                     </div>
 
                     <div className="px-3 mb-6">
-                        <h3 className="px-3 text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">我的音樂庫</h3>
+                        <h3 className="px-3 text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">{t('netease.myMusicLibrary')}</h3>
                         <button onClick={() => handleTabClick('playlists')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === 'playlists' ? 'bg-red-500/20 text-red-400' : 'hover:bg-white/5 text-gray-300'}`}>
                             <ListMusic size={18} />
-                            我的歌單
+                            {t('netease.myPlaylists')}
                         </button>
                         <button onClick={() => handleTabClick('favorites')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === 'favorites' ? 'bg-red-500/20 text-red-400' : 'hover:bg-white/5 text-gray-300'}`}>
                             <Heart size={18} />
-                            我喜歡的音樂
+                            {t('netease.myFavorites')}
                         </button>
                     </div>
                     
@@ -291,7 +293,7 @@ export const NeteaseView: React.FC<{
                         {!isLoggedIn ? (
                             <button onClick={() => handleTabClick('login')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === 'login' ? 'bg-red-500/20 text-red-400' : 'hover:bg-white/5 text-gray-300'}`}>
                                 <QrCode size={18} />
-                                登入
+                                {t('netease.login')}
                             </button>
                         ) : (
                             <button onClick={handleLogout} className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium transition-colors hover:bg-white/5 text-gray-300 group">
@@ -299,9 +301,9 @@ export const NeteaseView: React.FC<{
                                     <div className="w-6 h-6 rounded-full bg-red-500/20 flex items-center justify-center">
                                         <span className="text-red-400 text-xs">Me</span>
                                     </div>
-                                    <span>已登入</span>
+                                    <span>{t('netease.loggedIn')}</span>
                                 </div>
-                                <span className="text-xs text-gray-500 opacity-0 group-hover:opacity-100">登出</span>
+                                <span className="text-xs text-gray-500 opacity-0 group-hover:opacity-100">{t('netease.logout')}</span>
                             </button>
                         )}
                     </div>
@@ -312,14 +314,14 @@ export const NeteaseView: React.FC<{
             <div className="flex-1 overflow-y-auto custom-scrollbar bg-black/20">
                 {searchQuery ? (
                     <div className="p-8">
-                        <h2 className="text-2xl font-bold mb-6">"{searchQuery}" 的搜尋結果</h2>
+                        <h2 className="text-2xl font-bold mb-6">{t('netease.searchResultsFor', { query: searchQuery })}</h2>
                         {isSearching ? (
                             <div className="flex justify-center py-12"><Loader2 className="animate-spin text-red-500" size={32} /></div>
                         ) : searchResults ? (
                             <div className="space-y-8">
                                 {searchResults.tracks.length > 0 && (
                                     <div>
-                                        <h3 className="text-xl font-bold mb-4">單曲</h3>
+                                        <h3 className="text-xl font-bold mb-4">{t('netease.songs')}</h3>
                                         <TrackList 
                                             tracks={searchResults.tracks} 
                                             provider={provider as any} 
@@ -334,7 +336,7 @@ export const NeteaseView: React.FC<{
                                 )}
                             </div>
                         ) : (
-                            <div className="text-center py-12 text-gray-400">找不到結果</div>
+                            <div className="text-center py-12 text-gray-400">{t('netease.noResults')}</div>
                         )}
                     </div>
                 ) : selectedPlaylist ? (
@@ -372,11 +374,11 @@ export const NeteaseView: React.FC<{
                 ) : activeTab === 'playlists' ? (
                     <div className="p-8">
                         <div className="flex items-center justify-between mb-8">
-                            <h2 className="text-3xl font-bold">我的歌單</h2>
+                            <h2 className="text-3xl font-bold">{t('netease.myPlaylists')}</h2>
                         </div>
                         {playlists.length === 0 ? (
                             <div className="text-center py-20 text-gray-400">
-                                {isLoggedIn ? '找不到歌單。' : '請登入以查看您的歌單。'}
+                                {isLoggedIn ? t('netease.noPlaylistsFound') : t('netease.loginToViewPlaylists')}
                             </div>
                         ) : (
                             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
@@ -406,7 +408,7 @@ export const NeteaseView: React.FC<{
                     <div className="p-8">
                         <div className="flex items-center justify-between mb-8">
                             <h2 className="text-3xl font-bold flex items-center gap-3">
-                                <Heart className="text-red-500" fill="currentColor" /> 我喜歡的音樂
+                                <Heart className="text-red-500" fill="currentColor" /> {t('netease.myFavorites')}
                             </h2>
                             {tracks.length > 0 && (
                                 <button 
@@ -414,7 +416,7 @@ export const NeteaseView: React.FC<{
                                     className="bg-red-600 hover:bg-red-500 text-white px-6 py-2.5 rounded-full font-bold flex items-center gap-2 transition-all shadow-[0_0_20px_rgba(220,38,38,0.3)]"
                                 >
                                     <Play fill="currentColor" size={18} />
-                                    播放全部
+                                    {t('netease.playAll')}
                                 </button>
                             )}
                         </div>
@@ -433,7 +435,7 @@ export const NeteaseView: React.FC<{
                             />
                         ) : (
                             <div className="text-center py-20 text-gray-400">
-                                {isLoggedIn ? '找不到喜歡的音樂。' : '請登入以查看喜歡的音樂。'}
+                                {isLoggedIn ? t('netease.noFavoritesFound') : t('netease.loginToViewFavorites')}
                             </div>
                         )}
                     </div>
@@ -443,7 +445,7 @@ export const NeteaseView: React.FC<{
                             <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mb-6">
                                 <QrCode size={32} className="text-red-400" />
                             </div>
-                            <h2 className="text-2xl font-bold mb-2">登入網易雲音樂</h2>
+                            <h2 className="text-2xl font-bold mb-2">{t('netease.loginToNetease')}</h2>
                             <p className="text-sm text-gray-400 mb-8">
                                 {qrStatus}
                             </p>
@@ -462,13 +464,13 @@ export const NeteaseView: React.FC<{
                                     className="w-full bg-red-600 hover:bg-red-500 text-white py-2.5 rounded-lg font-bold transition-colors flex items-center justify-center gap-2"
                                 >
                                     <Globe size={18} />
-                                    使用網頁版本登入
+                                    {t('netease.loginViaWeb')}
                                 </button>
                                 <button 
                                     onClick={startLoginFlow}
                                     className="text-sm text-gray-400 hover:text-white transition-colors py-2"
                                 >
-                                    重新產生 QR 碼
+                                    {t('netease.refreshQr')}
                                 </button>
                             </div>
                         </div>

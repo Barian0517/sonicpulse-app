@@ -10,6 +10,7 @@ import { Track, Album } from '../../providers/MusicProvider';
 import { NavidromeView } from './NavidromeView';
 import { NeteaseView } from './NeteaseView';
 import { MusicFreeView } from './MusicFreeView';
+import { useTranslation, Language } from '../../providers/I18nProvider';
 
 export const MusicPlayerLayout: React.FC<{ 
     isOpen: boolean; 
@@ -33,10 +34,15 @@ export const MusicPlayerLayout: React.FC<{
     const [searchQuery, setSearchQuery] = useState('');
     const [isSearching, setIsSearching] = useState(false);
     
+    // Settings Tab State
+    const [activeSettingsTab, setActiveSettingsTab] = useState<'basic' | 'storage' | 'server'>('basic');
+    
     // Timeline Seek State
     const [localSeek, setLocalSeek] = useState<number | null>(null);
     const timelineRef = useRef<HTMLDivElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
+
+    const { t, language, setLanguage } = useTranslation();
 
     const handleSourceClick = (source: 'local' | 'navidrome' | 'netease' | 'musicfree' | 'settings') => {
         if (activeSource === source) {
@@ -490,7 +496,7 @@ export const MusicPlayerLayout: React.FC<{
                                 <RefreshCw size={18} className="absolute opacity-0 group-hover:opacity-100 transition-opacity duration-300 animate-[spin_3s_linear_infinite]" />
                             )}
                         </div>
-                        <span className="text-[10px] font-medium">Local</span>
+                        <span className="text-[10px] font-medium">{t('sidebar.local')}</span>
                     </button>
                     
                     <button 
@@ -503,7 +509,7 @@ export const MusicPlayerLayout: React.FC<{
                                 <RefreshCw size={18} className="absolute opacity-0 group-hover:opacity-100 transition-opacity duration-300 animate-[spin_3s_linear_infinite]" />
                             )}
                         </div>
-                        <span className="text-[10px] font-medium">Navidrome</span>
+                        <span className="text-[10px] font-medium">{t('sidebar.navidrome')}</span>
                     </button>
                     
                     <button 
@@ -516,7 +522,7 @@ export const MusicPlayerLayout: React.FC<{
                                 <RefreshCw size={18} className="absolute opacity-0 group-hover:opacity-100 transition-opacity duration-300 animate-[spin_3s_linear_infinite]" />
                             )}
                         </div>
-                        <span className="text-[10px] font-medium">網易雲</span>
+                        <span className="text-[10px] font-medium">{t('sidebar.netease')}</span>
                     </button>
 
                     <button 
@@ -529,7 +535,7 @@ export const MusicPlayerLayout: React.FC<{
                                 <RefreshCw size={18} className="absolute opacity-0 group-hover:opacity-100 transition-opacity duration-300 animate-[spin_3s_linear_infinite]" />
                             )}
                         </div>
-                        <span className="text-[10px] font-medium">插件</span>
+                        <span className="text-[10px] font-medium">{t('sidebar.musicfree')}</span>
                     </button>
                 </div>
 
@@ -539,7 +545,7 @@ export const MusicPlayerLayout: React.FC<{
                         className={`w-14 h-14 rounded-2xl flex flex-col items-center justify-center gap-1 transition-all duration-300 ${activeSource === 'settings' ? 'bg-purple-500/20 text-purple-300 shadow-[0_0_20px_rgba(168,85,247,0.3)] border border-purple-500/30' : 'text-gray-500 hover:text-gray-300 hover:bg-white/5 hover:border hover:border-white/10'}`}
                     >
                         <Settings size={20} />
-                        <span className="text-[10px] font-medium">Settings</span>
+                        <span className="text-[10px] font-medium">{t('sidebar.settings')}</span>
                     </button>
                 </div>
             </div>
@@ -563,17 +569,17 @@ export const MusicPlayerLayout: React.FC<{
                     {activeSource === 'local' && !isLocalReady && (
                         <div className="flex flex-col items-center justify-center w-full h-full gap-4 opacity-70 hover:opacity-100 transition-opacity">
                             <FolderOpen size={48} className="text-purple-500 mb-2" />
-                            <h2 className="text-xl font-bold">Local Music Library</h2>
-                            <p className="text-sm text-gray-400 max-w-sm text-center">Scan a folder on your computer to build your local music library.</p>
+                            <h2 className="text-xl font-bold">{t('settings.localLibrary')}</h2>
+                            <p className="text-sm text-gray-400 max-w-sm text-center">{t('settings.scanPrompt')}</p>
                             <button onClick={handleSelectLocalFolder} className="mt-4 bg-purple-600 hover:bg-purple-500 px-6 py-2.5 rounded-full font-bold text-sm shadow-[0_0_20px_rgba(147,51,234,0.3)] transition-all active:scale-95">
-                                Select Folder
+                                {t('settings.selectFolder')}
                             </button>
                         </div>
                     )}
 
                     {activeSource === 'local' && isLocalReady && (
                         <div className="p-8 pb-32 w-full">
-                            <h2 className="text-2xl font-bold mb-6 tracking-wide drop-shadow-md">Local Tracks</h2>
+                            <h2 className="text-2xl font-bold mb-6 tracking-wide drop-shadow-md">{t('local.localTracks')}</h2>
                             <div className="flex flex-col gap-2">
                                 {tracks.map(track => (
                                     <div 
@@ -600,12 +606,12 @@ export const MusicPlayerLayout: React.FC<{
                     {activeSource === 'navidrome' && !isNaviReady && (
                         <div className="flex flex-col items-center justify-center w-full h-full gap-4 max-w-sm mx-auto">
                             <Server size={48} className="text-purple-500 mb-2" />
-                            <h2 className="text-xl font-bold">Connect to Navidrome</h2>
-                            <input type="text" placeholder="Server URL (e.g. http://localhost:4533)" value={naviUrl} onChange={e => setNaviUrl(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-sm" />
-                            <input type="text" placeholder="Username" value={naviUser} onChange={e => setNaviUser(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-sm" />
-                            <input type="password" placeholder="Password" value={naviPass} onChange={e => setNaviPass(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-sm" />
+                            <h2 className="text-xl font-bold">{t('settings.connectToNavidrome')}</h2>
+                            <input type="text" placeholder={t('settings.serverUrl')} value={naviUrl} onChange={e => setNaviUrl(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-sm" />
+                            <input type="text" placeholder={t('settings.username')} value={naviUser} onChange={e => setNaviUser(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-sm" />
+                            <input type="password" placeholder={t('settings.password')} value={naviPass} onChange={e => setNaviPass(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-sm" />
                             <button onClick={handleConnectNavi} className="w-full mt-2 bg-purple-600 hover:bg-purple-500 px-6 py-2.5 rounded-lg font-bold text-sm shadow-[0_0_20px_rgba(147,51,234,0.3)] transition-all">
-                                Connect
+                                {t('settings.connect')}
                             </button>
                         </div>
                     )}
@@ -627,11 +633,11 @@ export const MusicPlayerLayout: React.FC<{
                     {activeSource === 'netease' && !isNeteaseReady && (
                         <div className="flex flex-col items-center justify-center w-full h-full gap-4 max-w-sm mx-auto">
                             <Disc size={48} className="text-red-500 mb-2" />
-                            <h2 className="text-xl font-bold">Connect to Netease API</h2>
-                            <p className="text-sm text-gray-400 text-center mb-2">Provide a NeteaseCloudMusicApi URL</p>
-                            <input type="text" placeholder="Server URL (e.g. https://netease...vercel.app)" value={neteaseUrl} onChange={e => setNeteaseUrl(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-sm" />
+                            <h2 className="text-xl font-bold">{t('settings.connectToNetease')}</h2>
+                            <p className="text-sm text-gray-400 text-center mb-2">{t('settings.neteasePrompt')}</p>
+                            <input type="text" placeholder={t('settings.neteaseUrlPlaceholder')} value={neteaseUrl} onChange={e => setNeteaseUrl(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-sm" />
                             <button onClick={handleConnectNetease} className="w-full mt-2 bg-red-600 hover:bg-red-500 px-6 py-2.5 rounded-lg font-bold text-sm shadow-[0_0_20px_rgba(239,68,68,0.3)] transition-all">
-                                Connect
+                                {t('settings.connect')}
                             </button>
                         </div>
                     )}
@@ -663,36 +669,89 @@ export const MusicPlayerLayout: React.FC<{
                     )}
 
                     {activeSource === 'settings' && (
-                        <div className="w-full h-full flex flex-col items-center justify-center p-8">
-                            <div className="w-full max-w-md bg-white/5 p-8 rounded-2xl border border-white/10">
-                                <h2 className="text-2xl font-bold mb-6 flex items-center gap-2"><Settings className="text-purple-500" /> Settings</h2>
-                                
-                                <div className="mb-8">
-                                    <h3 className="text-lg font-bold mb-4 flex items-center gap-2"><Library size={20} className="text-blue-400" /> Local Library</h3>
-                                    <p className="text-sm text-gray-400 mb-4">Current folder: {localStorage.getItem('local_music_folder') || 'Not set'}</p>
-                                    <button onClick={handleSelectLocalFolder} className="bg-white/10 hover:bg-white/20 px-6 py-2 rounded-lg font-bold text-sm transition-all">
-                                        Change Folder
+                        <div className="w-full h-full flex flex-col p-8 pb-32">
+                            <h2 className="text-2xl font-bold mb-8 flex items-center gap-3 ml-2"><Settings className="text-purple-500" size={28} /> {t('settings.title')}</h2>
+                            <div className="flex flex-1 overflow-hidden bg-[#0d0d14]/80 rounded-2xl border border-white/10 shadow-2xl backdrop-blur-xl">
+                                {/* Settings Sidebar */}
+                                <div className="w-64 border-r border-white/10 flex flex-col p-4 gap-2 bg-black/20">
+                                    <button 
+                                        onClick={() => setActiveSettingsTab('basic')}
+                                        className={`flex items-center gap-3 px-4 py-3 rounded-xl font-bold text-sm transition-all ${activeSettingsTab === 'basic' ? 'bg-purple-600/20 text-purple-400 border border-purple-500/30 shadow-[0_0_15px_rgba(168,85,247,0.1)]' : 'text-gray-400 hover:text-white hover:bg-white/5 border border-transparent'}`}
+                                    >
+                                        🌐 {t('settings.tabs.basic')}
+                                    </button>
+                                    <button 
+                                        onClick={() => setActiveSettingsTab('storage')}
+                                        className={`flex items-center gap-3 px-4 py-3 rounded-xl font-bold text-sm transition-all ${activeSettingsTab === 'storage' ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30 shadow-[0_0_15px_rgba(59,130,246,0.1)]' : 'text-gray-400 hover:text-white hover:bg-white/5 border border-transparent'}`}
+                                    >
+                                        <FolderOpen size={18} /> {t('settings.tabs.storage')}
+                                    </button>
+                                    <button 
+                                        onClick={() => setActiveSettingsTab('server')}
+                                        className={`flex items-center gap-3 px-4 py-3 rounded-xl font-bold text-sm transition-all ${activeSettingsTab === 'server' ? 'bg-green-600/20 text-green-400 border border-green-500/30 shadow-[0_0_15px_rgba(34,197,94,0.1)]' : 'text-gray-400 hover:text-white hover:bg-white/5 border border-transparent'}`}
+                                    >
+                                        <Server size={18} /> {t('settings.tabs.server')}
                                     </button>
                                 </div>
+                                {/* Settings Content */}
+                                <div className="flex-1 p-8 overflow-y-auto custom-scrollbar relative">
+                                    {/* Decorative glow */}
+                                    <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-[100px] -z-10 pointer-events-none" />
+                                    
+                                    {activeSettingsTab === 'basic' && (
+                                        <div className="max-w-2xl animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                            <div className="bg-white/5 p-6 rounded-2xl border border-white/5 shadow-inner">
+                                                <h3 className="text-lg font-bold mb-4 flex items-center gap-2">🌐 {t('settings.language')}</h3>
+                                                <select 
+                                                    value={language}
+                                                    onChange={(e) => setLanguage(e.target.value as Language)}
+                                                    className="bg-[#151520] border border-white/20 text-white text-sm rounded-xl focus:ring-purple-500 focus:border-purple-500 block w-full p-3 outline-none cursor-pointer transition-colors shadow-sm"
+                                                >
+                                                    <option value="zh-TW" className="bg-[#151520] text-white">繁體中文</option>
+                                                    <option value="zh-CN" className="bg-[#151520] text-white">简体中文</option>
+                                                    <option value="ja" className="bg-[#151520] text-white">日本語</option>
+                                                    <option value="en" className="bg-[#151520] text-white">English</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                    )}
 
-                                <div className="mb-8">
-                                    <h3 className="text-lg font-bold mb-4 flex items-center gap-2"><Plug size={20} className="text-purple-400" /> MusicFree 插件</h3>
-                                    <p className="text-sm text-gray-400 mb-4 break-all">目前資料夾: {musicFreePluginDir || '預設'}</p>
-                                    <button onClick={handleSelectMusicFreeFolder} className="bg-white/10 hover:bg-white/20 px-6 py-2 rounded-lg font-bold text-sm transition-all">
-                                        更換資料夾
-                                    </button>
-                                </div>
+                                    {activeSettingsTab === 'storage' && (
+                                        <div className="max-w-2xl flex flex-col gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                            <div className="bg-white/5 p-6 rounded-2xl border border-white/5 shadow-inner">
+                                                <h3 className="text-lg font-bold mb-4 flex items-center gap-2"><Library size={20} className="text-blue-400" /> {t('settings.localLibrary')}</h3>
+                                                <p className="text-sm text-gray-400 mb-5 bg-black/20 p-3 rounded-lg border border-white/5 font-mono">{t('settings.currentFolder', { folder: localStorage.getItem('local_music_folder') || t('settings.notSet') })}</p>
+                                                <button onClick={handleSelectLocalFolder} className="bg-white/10 hover:bg-white/20 px-6 py-2.5 rounded-xl font-bold text-sm transition-all border border-white/10 hover:shadow-lg active:scale-95">
+                                                    {t('settings.changeFolder')}
+                                                </button>
+                                            </div>
+                                            <div className="bg-white/5 p-6 rounded-2xl border border-white/5 shadow-inner">
+                                                <h3 className="text-lg font-bold mb-4 flex items-center gap-2"><Plug size={20} className="text-purple-400" /> {t('settings.musicFreePlugin')}</h3>
+                                                <p className="text-sm text-gray-400 mb-5 break-all bg-black/20 p-3 rounded-lg border border-white/5 font-mono">{t('settings.currentFolder', { folder: musicFreePluginDir || t('settings.musicFreePluginDir') })}</p>
+                                                <button onClick={handleSelectMusicFreeFolder} className="bg-white/10 hover:bg-white/20 px-6 py-2.5 rounded-xl font-bold text-sm transition-all border border-white/10 hover:shadow-lg active:scale-95">
+                                                    {t('settings.changeFolder')}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
 
-                                <div>
-                                    <h3 className="text-lg font-bold mb-4 flex items-center gap-2"><Server size={20} className="text-green-400" /> Navidrome Server</h3>
-                                    <div className="flex flex-col gap-3">
-                                        <input type="text" placeholder="Server URL (e.g. http://localhost:4533)" value={naviUrl} onChange={e => setNaviUrl(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-sm" />
-                                        <input type="text" placeholder="Username" value={naviUser} onChange={e => setNaviUser(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-sm" />
-                                        <input type="password" placeholder="Password" value={naviPass} onChange={e => setNaviPass(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-sm" />
-                                        <button onClick={handleConnectNavi} className="mt-2 bg-purple-600 hover:bg-purple-500 px-6 py-2.5 rounded-lg font-bold text-sm shadow-[0_0_20px_rgba(147,51,234,0.3)] transition-all">
-                                            Save & Connect
-                                        </button>
-                                    </div>
+                                    {activeSettingsTab === 'server' && (
+                                        <div className="max-w-2xl animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                            <div className="bg-white/5 p-6 rounded-2xl border border-white/5 shadow-inner">
+                                                <h3 className="text-lg font-bold mb-6 flex items-center gap-2"><Server size={20} className="text-green-400" /> {t('settings.navidromeServer')}</h3>
+                                                <div className="flex flex-col gap-4">
+                                                    <input type="text" placeholder={t('settings.serverUrl')} value={naviUrl} onChange={e => setNaviUrl(e.target.value)} className="w-full bg-[#151520] border border-white/10 rounded-xl px-4 py-3 text-sm focus:border-green-500/50 outline-none transition-colors shadow-sm" />
+                                                    <input type="text" placeholder={t('settings.username')} value={naviUser} onChange={e => setNaviUser(e.target.value)} className="w-full bg-[#151520] border border-white/10 rounded-xl px-4 py-3 text-sm focus:border-green-500/50 outline-none transition-colors shadow-sm" />
+                                                    <input type="password" placeholder={t('settings.password')} value={naviPass} onChange={e => setNaviPass(e.target.value)} className="w-full bg-[#151520] border border-white/10 rounded-xl px-4 py-3 text-sm focus:border-green-500/50 outline-none transition-colors shadow-sm" />
+                                                    <div className="pt-2">
+                                                        <button onClick={handleConnectNavi} className="bg-green-600/80 hover:bg-green-500 text-white px-6 py-3 rounded-xl font-bold text-sm shadow-[0_0_20px_rgba(34,197,94,0.3)] hover:shadow-[0_0_30px_rgba(34,197,94,0.5)] transition-all active:scale-95">
+                                                            {t('settings.saveAndConnect')}
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -710,14 +769,14 @@ export const MusicPlayerLayout: React.FC<{
                             )}
                         </div>
                         <div className="min-w-0 flex-1 pr-2">
-                            <h4 className="font-bold text-sm text-white truncate">{currentTrack?.title || "No track playing"}</h4>
+                            <h4 className="font-bold text-sm text-white truncate">{currentTrack?.title || t('player.noTrackPlaying')}</h4>
                             <p className="text-xs text-gray-400 truncate">{currentTrack?.artist || "-"}</p>
                         </div>
                         {currentTrack && (
                             <button 
                                 onClick={(e) => { e.stopPropagation(); handleToggleLike(); }}
                                 className={`p-2 transition-colors active:scale-95 ${isCurrentTrackLiked ? 'text-red-500' : 'text-gray-500 hover:text-white'}`}
-                                title={isCurrentTrackLiked ? "取消喜歡" : "加入喜歡"}
+                                title={isCurrentTrackLiked ? t('player.cancelLike') : t('player.addLike')}
                             >
                                 <Heart size={20} className={isCurrentTrackLiked ? "fill-current" : ""} />
                             </button>
@@ -752,7 +811,7 @@ export const MusicPlayerLayout: React.FC<{
                     </div>
 
                     <div className="w-1/3 flex justify-end items-center shrink-0 text-gray-400 text-sm gap-4">
-                       <button onClick={onToggleLyrics} className={`${isLyricsEnabled ? 'text-purple-400 font-bold' : 'hover:text-white'} transition-colors`}>Lyrics</button>
+                       <button onClick={onToggleLyrics} className={`${isLyricsEnabled ? 'text-purple-400 font-bold' : 'hover:text-white'} transition-colors`}>{t('player.lyrics')}</button>
                        <div className="flex items-center gap-2 group w-24">
                            <input type="range" min="0" max="1" step="0.01" value={volume} onChange={handleVolumeChangeUi} className="w-full h-1 bg-white/10 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:rounded-full hover:[&::-webkit-slider-thumb]:bg-purple-400" />
                        </div>

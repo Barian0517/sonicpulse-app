@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Music2, Play, Heart, DownloadCloud, CheckCircle2, Star, MoreHorizontal, Plus } from 'lucide-react';
 import { MusicProvider, Track, Playlist } from '../../providers/MusicProvider';
 import { offlineManager } from '../../providers/OfflineManager';
+import { useTranslation } from '../../providers/I18nProvider';
 
 export const TrackList: React.FC<{
     tracks: Track[];
@@ -24,6 +25,7 @@ export const TrackList: React.FC<{
     const [menuPosition, setMenuPosition] = useState({ x: 0, y: 0 });
     const [playlists, setPlaylists] = useState<Playlist[]>([]);
     const [showPlaylists, setShowPlaylists] = useState(false);
+    const { t } = useTranslation();
 
     useEffect(() => {
         // Fetch playlists for the "Add to Playlist" sub-menu
@@ -86,7 +88,7 @@ export const TrackList: React.FC<{
             if (provider.name === 'Netease Cloud Music') {
                 const ok = await (provider as any).likeSong(track.id, !current);
                 if (ok) {
-                    window.dispatchEvent(new CustomEvent('sonicpulse-toast', { detail: !current ? "已加入紅心歌曲" : "已取消紅心" }));
+                    window.dispatchEvent(new CustomEvent('sonicpulse-toast', { detail: !current ? t('player.addLike') : t('player.cancelLike') }));
                     
                     // Update global cache
                     const ids = new Set((window as any).__sonicpulse_liked_ids || []);
@@ -96,7 +98,7 @@ export const TrackList: React.FC<{
                     
                     window.dispatchEvent(new CustomEvent('sonicpulse-liked-songs-updated'));
                 } else {
-                    window.dispatchEvent(new CustomEvent('sonicpulse-toast', { detail: "加入紅心失敗" }));
+                    window.dispatchEvent(new CustomEvent('sonicpulse-toast', { detail: t('common.error') || "加入紅心失敗" }));
                     setStarredStatus(prev => ({ ...prev, [track.id]: current })); // Revert
                 }
             } else {
@@ -211,11 +213,11 @@ export const TrackList: React.FC<{
 
                         {/* Always visible actions or indicators */}
                         <div className="flex items-center gap-3 shrink-0">
-                            <button onClick={(e) => handleToggleStar(e, track)} className={`hover:scale-110 transition-transform ${isStarred ? 'text-red-500' : 'text-gray-600 hover:text-white'}`} title={isStarred ? "Remove from Favorites" : "Add to Favorites"}>
+                            <button onClick={(e) => handleToggleStar(e, track)} className={`hover:scale-110 transition-transform ${isStarred ? 'text-red-500' : 'text-gray-600 hover:text-white'}`} title={isStarred ? t('player.cancelLike') : t('player.addLike')}>
                                 <Heart size={16} fill={isStarred ? "currentColor" : "none"} />
                             </button>
 
-                            <button onClick={(e) => handleDownload(e, track)} className={`hover:scale-110 transition-transform ${isDownloaded ? 'text-green-500' : isDownloading ? 'text-blue-400 animate-bounce' : 'text-gray-600 hover:text-white'}`} title={isDownloaded ? "Downloaded" : "Download for Offline Play"}>
+                            <button onClick={(e) => handleDownload(e, track)} className={`hover:scale-110 transition-transform ${isDownloaded ? 'text-green-500' : isDownloading ? 'text-blue-400 animate-bounce' : 'text-gray-600 hover:text-white'}`} title={isDownloaded ? t('player.downloaded') : t('player.downloadForOffline')}>
                                 {isDownloaded ? <CheckCircle2 size={16} /> : <DownloadCloud size={16} />}
                             </button>
                             
@@ -249,7 +251,7 @@ export const TrackList: React.FC<{
                                 }
                                 setMenuTrackId(null);
                             }}>
-                                <Play size={16} /> 播放 (Play)
+                                <Play size={16} /> {t('player.play')}
                             </button>
                             <button className="w-full text-left px-4 py-2 hover:bg-white/10 flex items-center gap-3 transition-colors" onClick={() => {
                                 const t = tracks.find(t => t.id === menuTrackId);
@@ -258,7 +260,7 @@ export const TrackList: React.FC<{
                                     setMenuTrackId(null);
                                 }
                             }}>
-                                <Play size={16} className="rotate-90" /> 下一首播放 (Play Next)
+                                <Play size={16} className="rotate-90" /> {t('player.playNext')}
                             </button>
                             <button className="w-full text-left px-4 py-2 hover:bg-white/10 flex items-center gap-3 transition-colors" onClick={() => {
                                 const t = tracks.find(t => t.id === menuTrackId);
@@ -267,18 +269,18 @@ export const TrackList: React.FC<{
                                     setMenuTrackId(null);
                                 }
                             }}>
-                                <Plus size={16} /> 加入播放序列 (Add to Queue)
+                                <Plus size={16} /> {t('player.addToQueue')}
                             </button>
                             <div className="h-px bg-white/10 my-1"></div>
                             <button className="w-full text-left px-4 py-2 hover:bg-white/10 flex items-center gap-3 transition-colors" onClick={() => setShowPlaylists(true)}>
-                                <Heart size={16} /> 收藏到播放清單...
+                                <Heart size={16} /> {t('player.saveToPlaylist')}
                             </button>
                             <button className="w-full text-left px-4 py-2 hover:bg-white/10 flex items-center gap-3 transition-colors" onClick={() => {
                                 const t = tracks.find(t => t.id === menuTrackId);
                                 if (t) handleDownload({ stopPropagation: ()=>{} } as any, t);
                                 setMenuTrackId(null);
                             }}>
-                                <DownloadCloud size={16} /> 下載 (Download)
+                                <DownloadCloud size={16} /> {t('player.download')}
                             </button>
                             {onRemoveFromPlaylist && (
                                 <>
@@ -291,35 +293,35 @@ export const TrackList: React.FC<{
                                         }
                                         setMenuTrackId(null);
                                     }}>
-                                        <MoreHorizontal size={16} /> 從播放清單移除
+                                        <MoreHorizontal size={16} /> {t('player.removeFromPlaylist')}
                                     </button>
                                 </>
                             )}
                         </>
                     ) : (
                         <div className="max-h-64 overflow-y-auto">
-                            <div className="px-4 py-2 text-xs text-gray-500 font-bold border-b border-white/10 mb-1">加入到播放清單</div>
+                            <div className="px-4 py-2 text-xs text-gray-500 font-bold border-b border-white/10 mb-1">{t('player.addToPlaylist')}</div>
                             <button className="w-full text-left px-4 py-2 hover:bg-white/10 flex items-center gap-3 text-purple-400 transition-colors" onClick={async () => {
-                                const name = prompt("輸入新播放清單名稱:");
+                                const name = prompt(t('player.newPlaylistPrompt'));
                                 if (name && name.trim()) {
                                     try {
                                         const pl = await provider.createPlaylist(name.trim());
                                         await provider.updatePlaylist(pl.id, undefined, [menuTrackId!]);
-                                        alert("成功建立並加入播放清單!");
+                                        window.dispatchEvent(new CustomEvent('sonicpulse-toast', { detail: t('player.createPlaylistSuccess') || "成功建立並加入播放清單!" }));
                                         setMenuTrackId(null);
                                         provider.getPlaylists().then(setPlaylists);
-                                    } catch (e) { alert("建立失敗"); }
+                                    } catch (e) { window.dispatchEvent(new CustomEvent('sonicpulse-toast', { detail: t('player.createPlaylistFailed') || "建立失敗" })); }
                                 }
                             }}>
-                                <Plus size={16} /> 新建播放清單...
+                                <Plus size={16} /> {t('player.newPlaylist')}
                             </button>
                             {playlists.map(pl => (
                                 <button key={pl.id} className="w-full text-left px-4 py-2 hover:bg-white/10 truncate transition-colors" onClick={async () => {
                                     try {
                                         await provider.updatePlaylist(pl.id, undefined, [menuTrackId!]);
-                                        alert(`已加入到 ${pl.name}`);
+                                        window.dispatchEvent(new CustomEvent('sonicpulse-toast', { detail: t('player.addedToPlaylist', { name: pl.name }) || `已加入到 ${pl.name}` }));
                                         setMenuTrackId(null);
-                                    } catch (e) { alert("加入失敗"); }
+                                    } catch (e) { window.dispatchEvent(new CustomEvent('sonicpulse-toast', { detail: t('player.addToPlaylistFailed') || "加入失敗" })); }
                                 }}>
                                     {pl.name}
                                 </button>

@@ -3,6 +3,7 @@ import { Search, Loader2, Music2, Plug, Play, PlayCircle, MoreHorizontal, Heart,
 import { MusicFreeProvider } from '../../providers/MusicFreeProvider';
 import { Track } from '../../providers/MusicProvider';
 import { MusicFreePluginManager } from './MusicFreePluginManager';
+import { useTranslation } from '../../providers/I18nProvider';
 
 export const MusicFreeView: React.FC<{
     provider: MusicFreeProvider;
@@ -21,6 +22,7 @@ export const MusicFreeView: React.FC<{
     // Favorites and History states
     const [favorites, setFavorites] = useState<Track[]>([]);
     const [history, setHistory] = useState<Track[]>([]);
+    const { t } = useTranslation();
 
     const loadPlugins = async () => {
         try {
@@ -111,13 +113,13 @@ export const MusicFreeView: React.FC<{
             if (!current) ids.add(track.id);
             else ids.delete(track.id);
             (window as any).__sonicpulse_liked_ids = Array.from(ids);
-            window.dispatchEvent(new CustomEvent('sonicpulse-toast', { detail: !current ? "已加入紅心歌曲" : "已取消紅心" }));
+            window.dispatchEvent(new CustomEvent('sonicpulse-toast', { detail: !current ? t('player.addLike') : t('player.cancelLike') }));
             window.dispatchEvent(new CustomEvent('sonicpulse-liked-songs-updated'));
             // Force re-render just to update the UI immediately
             setSearchResults([...searchResults]);
         } catch (error) {
             console.error(error);
-            window.dispatchEvent(new CustomEvent('sonicpulse-toast', { detail: "操作失敗" }));
+            window.dispatchEvent(new CustomEvent('sonicpulse-toast', { detail: t('common.error') || "操作失敗" }));
         }
     };
 
@@ -195,7 +197,7 @@ export const MusicFreeView: React.FC<{
                             </div>
                         </div>
                         <div className="flex items-center gap-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button onClick={(e) => handleToggleStar(e, track)} className={`hover:scale-110 transition-transform ${((window as any).__sonicpulse_liked_ids || []).includes(track.id) ? 'text-red-500' : 'text-gray-600 hover:text-white'}`} title={((window as any).__sonicpulse_liked_ids || []).includes(track.id) ? "取消紅心" : "加入紅心歌曲"}>
+                            <button onClick={(e) => handleToggleStar(e, track)} className={`hover:scale-110 transition-transform ${((window as any).__sonicpulse_liked_ids || []).includes(track.id) ? 'text-red-500' : 'text-gray-600 hover:text-white'}`} title={((window as any).__sonicpulse_liked_ids || []).includes(track.id) ? t('player.cancelLike') : t('player.addLike')}>
                                 <Heart size={20} className={((window as any).__sonicpulse_liked_ids || []).includes(track.id) ? 'fill-red-500' : ''} />
                             </button>
                             <button className="text-gray-400 hover:text-white p-2 rounded-full hover:bg-white/10 transition-colors">
@@ -226,28 +228,28 @@ export const MusicFreeView: React.FC<{
                         className={`flex items-center gap-3 px-4 py-2.5 rounded-xl font-medium transition-all ${activeTab === 'search' ? 'bg-purple-500 text-white shadow-[0_0_20px_rgba(168,85,247,0.3)]' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
                     >
                         <Search size={18} />
-                        搜尋音樂
+                        {t('musicfree.searchMusic')}
                     </button>
                     <button 
                         onClick={() => setActiveTab('history')}
                         className={`flex items-center gap-3 px-4 py-2.5 rounded-xl font-medium transition-all ${activeTab === 'history' ? 'bg-purple-500 text-white shadow-[0_0_20px_rgba(168,85,247,0.3)]' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
                     >
                         <Clock size={18} />
-                        撥放歷史
+                        {t('musicfree.playHistory')}
                     </button>
                     <button 
                         onClick={() => setActiveTab('favorites')}
                         className={`flex items-center gap-3 px-4 py-2.5 rounded-xl font-medium transition-all ${activeTab === 'favorites' ? 'bg-purple-500 text-white shadow-[0_0_20px_rgba(168,85,247,0.3)]' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
                     >
                         <Heart size={18} />
-                        我喜歡
+                        {t('musicfree.favorites')}
                     </button>
                     <button 
                         onClick={() => setActiveTab('playlists')}
                         className={`flex items-center gap-3 px-4 py-2.5 rounded-xl font-medium transition-all ${activeTab === 'playlists' ? 'bg-purple-500 text-white shadow-[0_0_20px_rgba(168,85,247,0.3)]' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
                     >
                         <ListMusic size={18} />
-                        我的歌單
+                        {t('musicfree.playlists')}
                     </button>
                 </div>
 
@@ -258,7 +260,7 @@ export const MusicFreeView: React.FC<{
                     className={`flex items-center gap-3 px-4 py-2.5 rounded-xl font-medium transition-all ${activeTab === 'plugins' ? 'bg-blue-500 text-white shadow-[0_0_20px_rgba(59,130,246,0.3)]' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
                 >
                     <Settings2 size={18} />
-                    插件管理
+                    {t('pluginManager.title')}
                 </button>
             </div>
 
@@ -267,7 +269,7 @@ export const MusicFreeView: React.FC<{
                 {activeTab === 'search' && (
                     <>
                         <div className="flex items-center justify-between mb-8">
-                            <h2 className="text-3xl font-black tracking-tight text-white/90">搜尋音樂</h2>
+                            <h2 className="text-3xl font-black tracking-tight text-white/90">{t('musicfree.searchMusic')}</h2>
                             <div className="flex items-center gap-4">
                                 <div className="flex items-center bg-black/40 border border-white/10 rounded-xl px-4 py-2 backdrop-blur-md">
                                     <Plug size={16} className="text-gray-400 mr-2" />
@@ -276,7 +278,7 @@ export const MusicFreeView: React.FC<{
                                         onChange={handlePluginChange}
                                         className="bg-transparent text-sm font-bold text-white outline-none appearance-none cursor-pointer pr-4"
                                     >
-                                        <option value="all" className="bg-[#1e1e2e] text-purple-400 font-bold">🌟 全部插件 (智慧聚合)</option>
+                                        <option value="all" className="bg-[#1e1e2e] text-purple-400 font-bold">🌟 {t('musicfree.allPlugins')}</option>
                                         {plugins.map(p => (
                                             <option key={p.id} value={p.id} className="bg-[#1e1e2e] text-white">
                                                 {p.platform} (v{p.version})
@@ -287,7 +289,7 @@ export const MusicFreeView: React.FC<{
                                 <div className="relative w-64">
                                     <input
                                         type="text"
-                                        placeholder="搜尋歌曲..."
+                                        placeholder={t('musicfree.searchPlaceholder')}
                                         value={searchQuery}
                                         onChange={(e) => setSearchQuery(e.target.value)}
                                         onKeyDown={(e) => {
@@ -304,25 +306,25 @@ export const MusicFreeView: React.FC<{
                         </div>
                         <div className="flex-1 overflow-y-auto custom-scrollbar pr-2">
                             {searchResults.length > 0 ? (
-                                renderTrackList(searchResults, <Search />, "搜尋結果")
+                                renderTrackList(searchResults, <Search />, t('musicfree.searchResults'))
                             ) : (
                                 <div className="w-full h-full flex flex-col items-center justify-center text-gray-500">
                                     {searchQuery ? (
                                         isSearching ? (
                                             <>
                                                 <Loader2 size={48} className="animate-spin text-purple-500/50 mb-4" />
-                                                <p className="text-lg">搜尋中...</p>
+                                                <p className="text-lg">{t('musicfree.searching')}</p>
                                             </>
                                         ) : (
                                             <>
                                                 <Search size={48} className="mb-4 opacity-20" />
-                                                <p className="text-lg">找不到歌曲</p>
+                                                <p className="text-lg">{t('musicfree.noResults')}</p>
                                             </>
                                         )
                                     ) : (
                                         <>
                                             <Search size={48} className="mb-4 opacity-20" />
-                                            <p className="text-lg">輸入關鍵字開始搜尋</p>
+                                            <p className="text-lg">{t('musicfree.searchPrompt')}</p>
                                         </>
                                     )}
                                 </div>
@@ -334,10 +336,10 @@ export const MusicFreeView: React.FC<{
                 {activeTab === 'history' && (
                     <>
                         <h2 className="text-3xl font-black mb-8 text-white tracking-tight flex items-center gap-3">
-                            <Clock className="text-purple-400" /> 最近播放
+                            <Clock className="text-purple-400" /> {t('musicfree.recentlyPlayed')}
                         </h2>
                         <div className="flex-1 overflow-y-auto custom-scrollbar pr-2">
-                            {renderTrackList(history, <Clock />, "尚無播放歷史")}
+                            {renderTrackList(history, <Clock />, t('musicfree.noHistory'))}
                         </div>
                     </>
                 )}
@@ -345,10 +347,10 @@ export const MusicFreeView: React.FC<{
                 {activeTab === 'favorites' && (
                     <>
                         <h2 className="text-3xl font-black mb-8 text-white tracking-tight flex items-center gap-3">
-                            <Heart className="text-red-400 fill-red-400/20" /> 我喜歡的音樂
+                            <Heart className="text-red-400 fill-red-400/20" /> {t('musicfree.favoriteMusic')}
                         </h2>
                         <div className="flex-1 overflow-y-auto custom-scrollbar pr-2">
-                            {renderTrackList(favorites, <Heart />, "尚無喜歡的音樂")}
+                            {renderTrackList(favorites, <Heart />, t('musicfree.noFavorites'))}
                         </div>
                     </>
                 )}
@@ -356,11 +358,11 @@ export const MusicFreeView: React.FC<{
                 {activeTab === 'playlists' && (
                     <>
                         <h2 className="text-3xl font-black mb-8 text-white tracking-tight flex items-center gap-3">
-                            <ListMusic className="text-purple-400" /> 我的歌單
+                            <ListMusic className="text-purple-400" /> {t('musicfree.playlists')}
                         </h2>
                         <div className="flex-1 overflow-y-auto custom-scrollbar flex flex-col items-center justify-center text-gray-500">
                             <ShieldCheck size={48} className="mb-4 opacity-20" />
-                            <p className="text-lg">歌單功能開發中...</p>
+                            <p className="text-lg">{t('musicfree.playlistsWip')}</p>
                         </div>
                     </>
                 )}

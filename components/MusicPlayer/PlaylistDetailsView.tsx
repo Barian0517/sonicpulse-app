@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Play, Shuffle, Plus, ListPlus, Loader2 } from 'lucide-react';
 import { MusicProvider, Track, Playlist } from '../../providers/MusicProvider';
 import { TrackList } from './TrackList';
+import { useTranslation } from '../../providers/I18nProvider';
 
 export const PlaylistDetailsView: React.FC<{
     playlist: Playlist;
@@ -16,6 +17,7 @@ export const PlaylistDetailsView: React.FC<{
 }> = ({ playlist, provider, onBack, onPlayTrack, onPlayNow, onPlayNext, onAddToQueue, currentTrackId, isPlaying }) => {
     const [tracks, setTracks] = useState<Track[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const { t } = useTranslation();
 
     useEffect(() => {
         loadTracks();
@@ -40,7 +42,7 @@ export const PlaylistDetailsView: React.FC<{
             loadTracks();
         } catch (e) {
             console.error('Failed to remove track from playlist', e);
-            alert('移除失敗 (Failed to remove)');
+            window.dispatchEvent(new CustomEvent('sonicpulse-toast', { detail: t('common.error') || '移除失敗' }));
         }
     };
 
@@ -56,7 +58,7 @@ export const PlaylistDetailsView: React.FC<{
                 <div className="flex-1 min-w-0">
                     <h2 className="text-3xl font-black mb-2">{playlist.name}</h2>
                     <p className="text-gray-400 font-bold uppercase tracking-widest text-sm mb-4">
-                        Playlist • {tracks.length} tracks
+                        {t('playlist.trackCount', { count: tracks.length })}
                     </p>
                     <div className="flex items-center gap-3">
                         <button 
@@ -68,7 +70,7 @@ export const PlaylistDetailsView: React.FC<{
                                 }
                             }}
                         >
-                            <Play size={18} fill="currentColor" /> 播放全部 (Play All)
+                            <Play size={18} fill="currentColor" /> {t('netease.playAll')}
                         </button>
                         <button 
                             className="bg-white/10 hover:bg-white/20 text-white p-2.5 rounded-full transition-all"
@@ -79,7 +81,7 @@ export const PlaylistDetailsView: React.FC<{
                                     else onPlayTrack(shuffled[0]);
                                 }
                             }}
-                            title="隨機播放 (Shuffle)"
+                            title={t('player.shuffle')}
                         >
                             <Shuffle size={18} />
                         </button>
@@ -90,7 +92,7 @@ export const PlaylistDetailsView: React.FC<{
                                     onAddToQueue(tracks);
                                 }
                             }}
-                            title="加入播放序列 (Add to Queue)"
+                            title={t('player.addToQueue')}
                         >
                             <Plus size={18} />
                         </button>

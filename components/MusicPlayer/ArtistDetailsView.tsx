@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, PlayCircle, Loader2, Mic2 } from 'lucide-react';
 import { MusicProvider, Album, Artist } from '../../providers/MusicProvider';
+import { useTranslation } from '../../providers/I18nProvider';
 
 export const ArtistDetailsView: React.FC<{
     artist: Artist;
@@ -10,6 +11,7 @@ export const ArtistDetailsView: React.FC<{
 }> = ({ artist, provider, onBack, onAlbumClick }) => {
     const [albums, setAlbums] = useState<Album[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const { t } = useTranslation();
 
     useEffect(() => {
         const fetchDetails = async () => {
@@ -29,7 +31,7 @@ export const ArtistDetailsView: React.FC<{
     return (
         <div className="flex flex-col h-full relative">
             <button onClick={onBack} className="flex items-center gap-2 text-gray-400 hover:text-white mb-6 w-max transition-colors">
-                <ArrowLeft size={20} /> Back
+                <ArrowLeft size={20} /> {t('common.back')}
             </button>
 
             <div className="flex items-end gap-6 mb-8">
@@ -43,7 +45,7 @@ export const ArtistDetailsView: React.FC<{
                 <div className="flex flex-col gap-2">
                     <h1 className="text-4xl font-bold text-white">{artist.name}</h1>
                     <div className="text-gray-400 flex items-center gap-2 text-sm">
-                        <span>{artist.albumCount || albums.length} albums</span>
+                        <span>{t('artist.albumCount', { count: artist.albumCount || albums.length })}</span>
                     </div>
                 </div>
             </div>
@@ -55,7 +57,7 @@ export const ArtistDetailsView: React.FC<{
                     </div>
                 ) : (
                     <div>
-                        <h2 className="text-xl font-bold mb-4">Albums</h2>
+                        <h2 className="text-xl font-bold mb-4">{t('artist.albums')}</h2>
                         <div className="grid grid-cols-4 gap-4">
                             {albums.map(album => (
                                 <div key={album.id} className="bg-white/5 p-3 rounded-xl hover:bg-white/10 cursor-pointer transition-colors group" onClick={() => onAlbumClick(album)}>

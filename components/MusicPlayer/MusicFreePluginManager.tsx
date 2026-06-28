@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Download, RefreshCw, Trash2, FolderPlus, Save, AlertTriangle, Settings2, Upload } from 'lucide-react';
 import { open } from '@tauri-apps/plugin-dialog';
+import { useTranslation } from '../../providers/I18nProvider';
 
 export const MusicFreePluginManager: React.FC<{ provider: any }> = ({ provider }) => {
     const [plugins, setPlugins] = useState<any[]>([]);
@@ -11,6 +12,7 @@ export const MusicFreePluginManager: React.FC<{ provider: any }> = ({ provider }
     // For Variables modal
     const [activePlugin, setActivePlugin] = useState<any>(null);
     const [variables, setVariables] = useState<Record<string, string>>({});
+    const { t } = useTranslation();
 
     const loadPlugins = async () => {
         setIsLoading(true);
@@ -116,7 +118,7 @@ export const MusicFreePluginManager: React.FC<{ provider: any }> = ({ provider }
     return (
         <div className="flex flex-col h-full overflow-hidden">
             <h2 className="text-3xl font-black mb-6 text-white tracking-tight flex items-center gap-3">
-                <Settings2 className="text-purple-400" /> 插件管理
+                <Settings2 className="text-purple-400" /> {t('pluginManager.title')}
             </h2>
 
             <div className="flex gap-4 mb-8 bg-black/40 p-4 rounded-xl border border-white/10">
@@ -126,7 +128,7 @@ export const MusicFreePluginManager: React.FC<{ provider: any }> = ({ provider }
                     className="flex items-center gap-2 px-4 py-2 bg-purple-500/20 hover:bg-purple-500/40 border border-purple-500/50 rounded-lg text-purple-300 font-bold transition-colors disabled:opacity-50"
                 >
                     <FolderPlus size={18} />
-                    從本地檔案安裝
+                    {t('pluginManager.installLocal')}
                 </button>
                 <div className="flex-1 flex gap-2">
                     <input 
@@ -142,7 +144,7 @@ export const MusicFreePluginManager: React.FC<{ provider: any }> = ({ provider }
                         className="flex items-center gap-2 px-4 py-2 bg-blue-500/20 hover:bg-blue-500/40 border border-blue-500/50 rounded-lg text-blue-300 font-bold transition-colors disabled:opacity-50"
                     >
                         <Download size={18} />
-                        從網路安裝
+                        {t('pluginManager.installUrl')}
                     </button>
                 </div>
             </div>
@@ -187,7 +189,7 @@ export const MusicFreePluginManager: React.FC<{ provider: any }> = ({ provider }
                                             )}
                                             {p.userVariables && p.userVariables.length > 0 && (
                                                 <button onClick={() => openVariables(p)} className="text-purple-400 hover:text-purple-300 text-sm font-medium flex items-center gap-1">
-                                                    <Settings2 size={14} /> 變量
+                                                    <Settings2 size={14} /> {t('pluginManager.variables')}
                                                 </button>
                                             )}
                                             {p.hasImportMusicSheet && (
@@ -196,7 +198,7 @@ export const MusicFreePluginManager: React.FC<{ provider: any }> = ({ provider }
                                                 </button>
                                             )}
                                             <button onClick={() => handleUninstall(p.id)} className="text-red-400 hover:text-red-300 text-sm font-medium flex items-center gap-1 ml-2">
-                                                <Trash2 size={14} /> 卸載
+                                                <Trash2 size={14} /> {t('pluginManager.uninstall')}
                                             </button>
                                         </div>
                                     </td>

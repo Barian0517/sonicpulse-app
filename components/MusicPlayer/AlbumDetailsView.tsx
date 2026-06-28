@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Play, Shuffle, Plus, DownloadCloud, Loader2, Disc3, ListPlus } from 'lucide-react';
 import { MusicProvider, Track, Album } from '../../providers/MusicProvider';
 import { TrackList } from './TrackList';
+import { useTranslation } from '../../providers/I18nProvider';
 
 export const AlbumDetailsView: React.FC<{
     album: Album;
@@ -16,6 +17,7 @@ export const AlbumDetailsView: React.FC<{
 }> = ({ album, provider, onBack, onPlayTrack, onPlayNow, onPlayNext, onAddToQueue, currentTrackId, isPlaying }) => {
     const [tracks, setTracks] = useState<Track[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const { t } = useTranslation();
 
     useEffect(() => {
         const fetchDetails = async () => {
@@ -35,7 +37,7 @@ export const AlbumDetailsView: React.FC<{
     return (
         <div className="flex flex-col h-full relative">
             <button onClick={onBack} className="flex items-center gap-2 text-gray-400 hover:text-white mb-6 w-max transition-colors">
-                <ArrowLeft size={20} /> Back
+                <ArrowLeft size={20} /> {t('common.back')}
             </button>
 
             <div className="flex items-end gap-6 mb-8">
@@ -53,9 +55,9 @@ export const AlbumDetailsView: React.FC<{
                     <div className="text-gray-400 flex items-center gap-2 text-sm">
                         <span className="font-bold text-white hover:underline cursor-pointer">{album.artist}</span>
                         <span>•</span>
-                        <span>{album.year || 'Unknown Year'}</span>
+                        <span>{album.year || t('album.unknownYear')}</span>
                         <span>•</span>
-                        <span>{album.songCount || tracks.length} tracks</span>
+                        <span>{t('album.trackCount', { count: album.songCount || tracks.length })}</span>
                     </div>
 
                     <div className="flex items-center gap-3 mt-4">
@@ -68,7 +70,7 @@ export const AlbumDetailsView: React.FC<{
                                 }
                             }}
                         >
-                            <Play size={18} fill="currentColor" /> 播放全部 (Play All)
+                            <Play size={18} fill="currentColor" /> {t('netease.playAll')}
                         </button>
                         <button 
                             className="bg-white/10 hover:bg-white/20 text-white p-2.5 rounded-full transition-all"
@@ -79,7 +81,7 @@ export const AlbumDetailsView: React.FC<{
                                     else onPlayTrack(shuffled[0]);
                                 }
                             }}
-                            title="Shuffle Album"
+                            title={t('player.shuffle')}
                         >
                             <Shuffle size={18} />
                         </button>
@@ -90,7 +92,7 @@ export const AlbumDetailsView: React.FC<{
                                     onAddToQueue(tracks);
                                 }
                             }}
-                            title="加入播放序列 (Add to Queue)"
+                            title={t('player.addToQueue')}
                         >
                             <Plus size={18} />
                         </button>
@@ -100,13 +102,13 @@ export const AlbumDetailsView: React.FC<{
                                 try {
                                     const pl = await provider.createPlaylist(album.name);
                                     await provider.updatePlaylist(pl.id, undefined, tracks.map(t => t.id));
-                                    alert(`已建立播放清單 "${album.name}" 並加入所有歌曲！`);
+                                    window.dispatchEvent(new CustomEvent('sonicpulse-toast', { detail: t('album.playlistCreated', { name: album.name }) }));
                                 } catch (e) {
                                     console.error(e);
-                                    alert('建立播放清單失敗');
+                                    window.dispatchEvent(new CustomEvent('sonicpulse-toast', { detail: t('album.createPlaylistFailed') }));
                                 }
                             }}
-                            title="收藏為播放清單 (Save as Playlist)"
+                            title={t('album.saveAsPlaylist')}
                         >
                             <ListPlus size={18} />
                         </button>
@@ -123,7 +125,7 @@ export const AlbumDetailsView: React.FC<{
                                     }
                                 }
                             }}
-                            title="Download Entire Album"
+                            title={t('album.downloadAlbum')}
                         >
                             <DownloadCloud size={18} />
                         </button>

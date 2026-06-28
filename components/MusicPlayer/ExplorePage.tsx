@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { MusicProvider, Track } from '../../providers/MusicProvider';
 import { TrackList } from './TrackList';
 import { Heart, Play, Music } from 'lucide-react';
+import { useTranslation } from '../../providers/I18nProvider';
 
 export const ExplorePage: React.FC<{
     provider: MusicProvider;
@@ -14,6 +15,7 @@ export const ExplorePage: React.FC<{
     const [frequentTracks, setFrequentTracks] = useState<Track[]>([]);
     const [randomTracks, setRandomTracks] = useState<Track[]>([]);
     const [neteaseRecommendations, setNeteaseRecommendations] = useState<Track[]>([]);
+    const { t } = useTranslation();
 
     // Trigger re-render when liked songs update
     const [, forceUpdate] = useState({});
@@ -55,12 +57,12 @@ export const ExplorePage: React.FC<{
     return (
         <div className="flex flex-col gap-8">
             <div>
-                <h2 className="text-2xl font-bold mb-4">Recommended for You</h2>
+                <h2 className="text-2xl font-bold mb-4">{t('explore.recommendedForYou')}</h2>
                 <div className="bg-gradient-to-r from-purple-900/40 to-blue-900/40 rounded-2xl p-8 border border-white/5">
-                    <h3 className="text-xl font-bold mb-2 text-white">Daily Mix</h3>
-                    <p className="text-sm text-gray-400 mb-6">A personalized mix of tracks based on your listening history.</p>
+                    <h3 className="text-xl font-bold mb-2 text-white">{t('explore.dailyMix')}</h3>
+                    <p className="text-sm text-gray-400 mb-6">{t('explore.dailyMixDesc')}</p>
                     <button className="bg-purple-600 hover:bg-purple-500 text-white px-6 py-2.5 rounded-full font-bold shadow-lg shadow-purple-500/30 transition-all active:scale-95">
-                        Play Mix
+                        {t('explore.playMix')}
                     </button>
                 </div>
             </div>
@@ -68,13 +70,13 @@ export const ExplorePage: React.FC<{
             {neteaseRecommendations.length > 0 && (
                 <div>
                     <div className="flex items-center gap-4 mb-4">
-                        <h2 className="text-xl font-bold text-white">你的紅心歌曲和相似推薦</h2>
+                        <h2 className="text-xl font-bold text-white">{t('explore.likedAndSimilar')}</h2>
                         <button 
                             onClick={() => onPlayNow && onPlayNow(neteaseRecommendations)}
                             className="flex items-center gap-1 bg-white/10 hover:bg-white/20 text-white text-xs px-3 py-1.5 rounded-full font-medium transition-colors"
                         >
                             <Play size={12} fill="currentColor" />
-                            播放全部
+                            {t('explore.playAll')}
                         </button>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -101,7 +103,7 @@ export const ExplorePage: React.FC<{
                                     <h4 className="text-sm font-bold text-white truncate mb-1">{track.title}</h4>
                                     <div className="flex items-center gap-2">
                                         {((window as any).__sonicpulse_liked_ids || []).includes(track.id) && <Heart size={12} className="text-red-500 fill-red-500 shrink-0" />}
-                                        <span className="text-[10px] text-[#e8b548] border border-[#e8b548]/30 px-1 rounded uppercase tracking-wider shrink-0 font-bold bg-[#e8b548]/10">超清母帶</span>
+                                        <span className="text-[10px] text-[#e8b548] border border-[#e8b548]/30 px-1 rounded uppercase tracking-wider shrink-0 font-bold bg-[#e8b548]/10">{t('explore.hqMaster')}</span>
                                         <span className="text-xs text-gray-400 truncate">{track.artist}</span>
                                     </div>
                                 </div>
@@ -112,7 +114,7 @@ export const ExplorePage: React.FC<{
             )}
 
             <div>
-                <h2 className="text-2xl font-bold mb-4">Random Discovery</h2>
+                <h2 className="text-2xl font-bold mb-4">{t('explore.randomDiscovery')}</h2>
                 <TrackList 
                     tracks={randomTracks} 
                     provider={provider} 

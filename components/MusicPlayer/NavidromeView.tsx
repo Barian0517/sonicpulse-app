@@ -8,6 +8,7 @@ import { offlineManager } from '../../providers/OfflineManager';
 import { AlbumDetailsView } from './AlbumDetailsView';
 import { ArtistDetailsView } from './ArtistDetailsView';
 import { PlaylistDetailsView } from './PlaylistDetailsView';
+import { useTranslation } from '../../providers/I18nProvider';
 
 type NavTab = 'explore' | 'artists' | 'albums' | 'playlists' | 'favorites' | 'downloads';
 
@@ -22,6 +23,7 @@ export const NavidromeView: React.FC<{
 }> = ({ provider, onPlayTrack, onPlayNow, onPlayNext, onAddToQueue, currentTrackId, isPlaying }) => {
     const [activeTab, setActiveTab] = useState<NavTab>('explore');
     const [isLoading, setIsLoading] = useState(false);
+    const { t } = useTranslation();
 
     // States for different views
     const [artists, setArtists] = useState<Artist[]>([]);
@@ -157,18 +159,18 @@ export const NavidromeView: React.FC<{
         <div className="flex h-full w-full bg-transparent text-white rounded-tl-2xl overflow-hidden relative">
             {/* Inner Sidebar for Navidrome */}
             <div className="w-56 bg-[#050508]/40 backdrop-blur-xl border-r border-white/10 flex flex-col p-5 gap-2 relative z-10 shadow-[4px_0_24px_rgba(0,0,0,0.2)]">
-                <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-4 px-2">Library</h3>
+                <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-4 px-2">{t('navidrome.library')}</h3>
                 
-                <NavButton active={activeTab === 'explore' && !selectedAlbum && !selectedArtist} onClick={() => handleTabClick('explore')} icon={<Compass size={18} />} label="Explore" />
-                <NavButton active={activeTab === 'favorites' && !selectedAlbum && !selectedArtist} onClick={() => handleTabClick('favorites')} icon={<Heart size={18} />} label="Favorites" />
-                <NavButton active={activeTab === 'playlists' && !selectedAlbum && !selectedArtist} onClick={() => handleTabClick('playlists')} icon={<ListMusic size={18} />} label="Playlists" />
+                <NavButton active={activeTab === 'explore' && !selectedAlbum && !selectedArtist} onClick={() => handleTabClick('explore')} icon={<Compass size={18} />} label={t('navidrome.explore')} />
+                <NavButton active={activeTab === 'favorites' && !selectedAlbum && !selectedArtist} onClick={() => handleTabClick('favorites')} icon={<Heart size={18} />} label={t('navidrome.favorites')} />
+                <NavButton active={activeTab === 'playlists' && !selectedAlbum && !selectedArtist} onClick={() => handleTabClick('playlists')} icon={<ListMusic size={18} />} label={t('navidrome.playlists')} />
                 
-                <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 mt-6 px-2">Music</h3>
-                <NavButton active={activeTab === 'albums' && !selectedAlbum && !selectedArtist} onClick={() => handleTabClick('albums')} icon={<Disc3 size={18} />} label="Albums" />
-                <NavButton active={activeTab === 'artists' && !selectedAlbum && !selectedArtist} onClick={() => handleTabClick('artists')} icon={<Mic2 size={18} />} label="Artists" />
+                <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 mt-6 px-2">{t('navidrome.music')}</h3>
+                <NavButton active={activeTab === 'albums' && !selectedAlbum && !selectedArtist} onClick={() => handleTabClick('albums')} icon={<Disc3 size={18} />} label={t('navidrome.albums')} />
+                <NavButton active={activeTab === 'artists' && !selectedAlbum && !selectedArtist} onClick={() => handleTabClick('artists')} icon={<Mic2 size={18} />} label={t('navidrome.artists')} />
                 
-                <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 mt-6 px-2">Offline</h3>
-                <NavButton active={activeTab === 'downloads' && !selectedAlbum && !selectedArtist} onClick={() => handleTabClick('downloads')} icon={<DownloadCloud size={18} />} label="Downloads" />
+                <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 mt-6 px-2">{t('navidrome.offline')}</h3>
+                <NavButton active={activeTab === 'downloads' && !selectedAlbum && !selectedArtist} onClick={() => handleTabClick('downloads')} icon={<DownloadCloud size={18} />} label={t('navidrome.downloads')} />
             </div>
 
             {/* Main Content Area */}
@@ -179,7 +181,7 @@ export const NavidromeView: React.FC<{
                         <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                         <input 
                             type="text" 
-                            placeholder="Search Navidrome library..." 
+                            placeholder={t('navidrome.searchPlaceholder')} 
                             value={searchQuery}
                             onChange={(e) => {
                                 setSearchQuery(e.target.value);
@@ -225,10 +227,10 @@ export const NavidromeView: React.FC<{
                     </div>
                 ) : searchResults ? (
                     <div className="flex-1">
-                        <h2 className="text-2xl font-bold mb-6">Search Results</h2>
+                        <h2 className="text-2xl font-bold mb-6">{t('navidrome.searchResults')}</h2>
                         {searchResults.artists.length > 0 && (
                             <div className="mb-8">
-                                <h3 className="text-xl font-bold text-gray-500 border-b border-white/10 pb-2 mb-4">Artists</h3>
+                                <h3 className="text-xl font-bold text-gray-500 border-b border-white/10 pb-2 mb-4">{t('navidrome.artists')}</h3>
                                 <div className="grid grid-cols-5 gap-4">
                                     {searchResults.artists.map(artist => (
                                         <div key={artist.id} className="flex flex-col items-center p-3 rounded-xl hover:bg-white/5 cursor-pointer transition-colors group" onClick={() => setSelectedArtist(artist)}>
@@ -247,7 +249,7 @@ export const NavidromeView: React.FC<{
                         )}
                         {searchResults.albums.length > 0 && (
                             <div className="mb-8">
-                                <h3 className="text-xl font-bold text-gray-500 border-b border-white/10 pb-2 mb-4">Albums</h3>
+                                <h3 className="text-xl font-bold text-gray-500 border-b border-white/10 pb-2 mb-4">{t('navidrome.albums')}</h3>
                                 <div className="grid grid-cols-4 gap-4">
                                     {searchResults.albums.map(album => (
                                         <div key={album.id} className="bg-white/5 p-3 rounded-xl hover:bg-white/10 cursor-pointer transition-colors group" onClick={() => setSelectedAlbum(album)}>
