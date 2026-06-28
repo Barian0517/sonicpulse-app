@@ -508,6 +508,7 @@ export const MusicPlayerLayout: React.FC<{
         jukeboxPersonalMode,
         setQueue,
         setQueueIndex,
+        queue,
         playTrackUrl,
         currentTrack,
         handleToggleLike
@@ -648,12 +649,25 @@ export const MusicPlayerLayout: React.FC<{
                     } else if (cmd.type === 'toggle_roaming') {
                         window.dispatchEvent(new CustomEvent('sonicpulse-toggle-roaming'));
                     } else if (cmd.type === 'get_personal_data' && s.jukeboxPersonalMode) {
+                        let naviUrl = localStorage.getItem('navidrome_url') || '';
+                        let naviUser = localStorage.getItem('navidrome_user') || '';
+                        let naviPass = localStorage.getItem('navidrome_pass') || '';
+                        try {
+                            const credsStr = localStorage.getItem('navidrome_creds');
+                            if (credsStr) {
+                                const creds = JSON.parse(credsStr);
+                                naviUrl = creds.url || naviUrl;
+                                naviUser = creds.user || naviUser;
+                                naviPass = creds.pass || naviPass;
+                            }
+                        } catch (e) {}
+
                         currentSocket.emit('personal_data', {
                             neteaseCookie: localStorage.getItem('netease_cookie'),
                             neteaseUid: localStorage.getItem('netease_uid'),
-                            navidromeUrl: localStorage.getItem('navidrome_server_url'),
-                            navidromeUser: localStorage.getItem('navidrome_username'),
-                            navidromePass: localStorage.getItem('navidrome_password')
+                            navidromeUrl: naviUrl,
+                            navidromeUser: naviUser,
+                            navidromePass: naviPass
                         });
                     } else if (cmd.type === 'toggle_heart' && s.jukeboxPersonalMode) {
                         if (cmd.trackId === s.currentTrack?.id) {
