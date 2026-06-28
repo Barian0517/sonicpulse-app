@@ -40,8 +40,9 @@ export const MusicPlayerLayout: React.FC<{
     const [activeSettingsTab, setActiveSettingsTab] = useState<'basic' | 'storage' | 'server' | 'jukebox' | 'preferences'>('basic');
     
     // Preferences State
-    const [playAllBehavior, setPlayAllBehavior] = useState<'replace' | 'insert'>(localStorage.getItem('sonicpulse_play_all_behavior') as 'replace' | 'insert' || 'insert');
-    const [playSingleBehavior, setPlaySingleBehavior] = useState<'replace' | 'insert'>(localStorage.getItem('sonicpulse_play_single_behavior') as 'replace' | 'insert' || 'insert');
+    type PlayBehavior = 'replace' | 'insert' | 'insert_next' | 'insert_last';
+    const [playAllBehavior, setPlayAllBehavior] = useState<PlayBehavior>(localStorage.getItem('sonicpulse_play_all_behavior') as PlayBehavior || 'insert');
+    const [playSingleBehavior, setPlaySingleBehavior] = useState<PlayBehavior>(localStorage.getItem('sonicpulse_play_single_behavior') as PlayBehavior || 'insert');
     
     // Timeline Seek State
     const [localSeek, setLocalSeek] = useState<number | null>(null);
@@ -55,6 +56,9 @@ export const MusicPlayerLayout: React.FC<{
     const [jukeboxPort, setJukeboxPort] = useState(localStorage.getItem('jukebox_port') || '8080');
     const [jukeboxAllowPlayNext, setJukeboxAllowPlayNext] = useState(localStorage.getItem('jukebox_allow_play_next') !== 'false');
     const [jukeboxAllowControl, setJukeboxAllowControl] = useState(localStorage.getItem('jukebox_allow_control') !== 'false');
+    const [jukeboxAllowCutSong, setJukeboxAllowCutSong] = useState(localStorage.getItem('jukebox_allow_cut_song') === 'true');
+    const [jukeboxAllowModifyQueue, setJukeboxAllowModifyQueue] = useState(localStorage.getItem('jukebox_allow_modify_queue') === 'true');
+    const [jukeboxPersonalMode, setJukeboxPersonalMode] = useState(localStorage.getItem('jukebox_personal_mode') === 'true');
     const [jukeboxSources, setJukeboxSources] = useState<string[]>(
         localStorage.getItem('jukebox_sources') 
             ? JSON.parse(localStorage.getItem('jukebox_sources')!) 
@@ -413,8 +417,12 @@ export const MusicPlayerLayout: React.FC<{
             setQueue(tracksToPlay);
             setQueueIndex(startIndex);
             playTrackUrl(tracksToPlay[startIndex]);
-        } else {
+        } else if (playAllBehavior === 'insert') {
             playInsertNextAndPlay(tracksToPlay, startIndex);
+        } else if (playAllBehavior === 'insert_next') {
+            playNext(tracksToPlay);
+        } else if (playAllBehavior === 'insert_last') {
+            addToQueue(tracksToPlay);
         }
     };
 
@@ -493,7 +501,15 @@ export const MusicPlayerLayout: React.FC<{
         handleNext,
         jukeboxSources,
         jukeboxAllowPlayNext,
-        jukeboxAllowControl
+        jukeboxAllowControl,
+        jukeboxAllowCutSong,
+        jukeboxAllowModifyQueue,
+        jukeboxPersonalMode,
+        setQueue,
+        setQueueIndex,
+        playTrackUrl,
+        currentTrack,
+        handleToggleLike
     });
 
     useEffect(() => {
@@ -509,7 +525,15 @@ export const MusicPlayerLayout: React.FC<{
             handleNext,
             jukeboxSources,
             jukeboxAllowPlayNext,
-            jukeboxAllowControl
+            jukeboxAllowControl,
+            jukeboxAllowCutSong,
+            jukeboxAllowModifyQueue,
+            jukeboxPersonalMode,
+            setQueue,
+            setQueueIndex,
+            playTrackUrl,
+            currentTrack,
+            handleToggleLike
         };
     });
 
@@ -586,6 +610,35 @@ export const MusicPlayerLayout: React.FC<{
                         else if (cmd.type === 'prev') s.handlePrev();
                         else if (cmd.type === 'next') s.handleNext();
                     }
+                    
+                    if (cmd.type === 'clear_queue' && s.jukeboxAllowModifyQueue) {
+                        window.dispatchEvent(new CustomEvent('sonicpulse-clear-queue'));
+                    } else if (cmd.type === 'remove_queue_item' && s.jukeboxAllowModifyQueue) {
+                        window.dispatchEvent(new CustomEvent('sonicpulse-remove-queue-track', { detail: cmd.index }));
+                    } else if (cmd.type === 'play_track' && s.jukeboxAllowCutSong) {
+                        s.setQueue([cmd.track]);
+                        s.setQueueIndex(0);
+                        s.playTrackUrl(cmd.track);
+                    } else if (cmd.type === 'insert_next' && s.jukeboxAllowPlayNext) {
+                        s.playNext([cmd.track]);
+                    } else if (cmd.type === 'insert_last' && s.jukeboxAllowPlayNext) {
+                        s.addToQueue([cmd.track]);
+                    } else if (cmd.type === 'toggle_roaming') {
+                        // Will implement roaming toggle event
+                        window.dispatchEvent(new CustomEvent('sonicpulse-toggle-roaming'));
+                    } else if (cmd.type === 'get_personal_data' && s.jukeboxPersonalMode) {
+                        currentSocket.emit('host_personal_data', { 
+                            likedIds: (window as any).__sonicpulse_liked_ids || [],
+                            // Can add history and playlists later
+                        });
+                    } else if (cmd.type === 'toggle_heart' && s.jukeboxPersonalMode) {
+                        // Optimistic dispatch to update local UI immediately if it's the current track
+                        if (cmd.trackId === s.currentTrack?.id) {
+                            s.handleToggleLike();
+                        } else {
+                            // TODO: Add generic like logic for non-current tracks if needed
+                        }
+                    }
                 });
             }
         }).catch(console.error);
@@ -610,11 +663,14 @@ export const MusicPlayerLayout: React.FC<{
                 permissions: {
                     allowPlayNext: jukeboxAllowPlayNext,
                     allowControl: jukeboxAllowControl,
+                    allowCutSong: jukeboxAllowCutSong,
+                    allowModifyQueue: jukeboxAllowModifyQueue,
+                    personalMode: jukeboxPersonalMode,
                     allowedSources: jukeboxSources
                 }
             });
         }
-    }, [isPlaying, progress, playbackState.duration, currentTrack, queue, jukeboxSocket, jukeboxEnabled, jukeboxAllowPlayNext, jukeboxAllowControl, jukeboxSources]);
+    }, [isPlaying, progress, playbackState.duration, currentTrack, queue, jukeboxSocket, jukeboxEnabled, jukeboxAllowPlayNext, jukeboxAllowControl, jukeboxAllowCutSong, jukeboxAllowModifyQueue, jukeboxPersonalMode, jukeboxSources]);
 
     useEffect(() => {
         const onTrackEnded = () => handleNext();
@@ -673,14 +729,18 @@ export const MusicPlayerLayout: React.FC<{
         };
     }, [queue, queueIndex]);
 
-    // Keep playTrack for backward compatibility with old views, mapping it to playInsertNextAndPlay
+    // Keep playTrack for backward compatibility with old views, mapping it to the user's preference
     const playTrack = async (track: Track) => {
         if (playSingleBehavior === 'replace') {
             setQueue([track]);
             setQueueIndex(0);
             playTrackUrl(track);
-        } else {
+        } else if (playSingleBehavior === 'insert') {
             playInsertNextAndPlay([track], 0);
+        } else if (playSingleBehavior === 'insert_next') {
+            playNext([track]);
+        } else if (playSingleBehavior === 'insert_last') {
+            addToQueue([track]);
         }
     };
 
@@ -1074,6 +1134,27 @@ export const MusicPlayerLayout: React.FC<{
                                                                     localStorage.setItem('jukebox_allow_control', String(e.target.checked));
                                                                 }} className="accent-purple-500" />
                                                                 <span className="text-sm text-gray-300">{t('settings.jukebox.allowControl') || '允許操作播放控制器'}</span>
+                                                            </label>
+                                                            <label className="flex items-center gap-2 cursor-pointer">
+                                                                <input type="checkbox" checked={jukeboxAllowCutSong} onChange={e => {
+                                                                    setJukeboxAllowCutSong(e.target.checked);
+                                                                    localStorage.setItem('jukebox_allow_cut_song', String(e.target.checked));
+                                                                }} className="accent-purple-500" />
+                                                                <span className="text-sm text-gray-300">{t('settings.jukebox.allowCutSong') || '允許切歌/強制播放'}</span>
+                                                            </label>
+                                                            <label className="flex items-center gap-2 cursor-pointer">
+                                                                <input type="checkbox" checked={jukeboxAllowModifyQueue} onChange={e => {
+                                                                    setJukeboxAllowModifyQueue(e.target.checked);
+                                                                    localStorage.setItem('jukebox_allow_modify_queue', String(e.target.checked));
+                                                                }} className="accent-purple-500" />
+                                                                <span className="text-sm text-gray-300">{t('settings.jukebox.allowModifyQueue') || '允許管理序列'}</span>
+                                                            </label>
+                                                            <label className="flex items-center gap-2 cursor-pointer mt-2 pt-2 border-t border-white/10">
+                                                                <input type="checkbox" checked={jukeboxPersonalMode} onChange={e => {
+                                                                    setJukeboxPersonalMode(e.target.checked);
+                                                                    localStorage.setItem('jukebox_personal_mode', String(e.target.checked));
+                                                                }} className="accent-purple-500" />
+                                                                <span className="text-sm text-purple-300 font-bold">{t('settings.jukebox.personalMode') || '啟用個人模式 (共享歌單/歷史)'}</span>
                                                             </label>
                                                         </div>
 

@@ -48,7 +48,9 @@
       "playAllBehavior": "「播放全部」行為",
       "playSingleBehavior": "「點擊單曲」行為",
       "behaviorReplace": "清除序列並播放",
-      "behaviorInsert": "插入並立刻播放"
+      "behaviorInsert": "插入並立刻播放",
+      "behaviorInsertNextNoPlay": "依序插入下一首 (不切歌)",
+      "behaviorInsertLastNoPlay": "從最後插入 (不切歌)"
     },
     "jukebox": {
       "title": "線上點歌 (Jukebox)",
@@ -56,6 +58,9 @@
       "port": "網站端口 (Port)",
       "permissions": "權限設定",
       "allowPlayNext": "允許插播 (加入到下一首)",
+      "allowCutSong": "允許切歌/強制播放",
+      "allowModifyQueue": "允許管理序列 (清除全部/移除單曲)",
+      "personalMode": "啟用個人模式 (開啟後點歌系統可存取主機的歷史、我的最愛與自訂歌單)",
       "allowControl": "允許操作播放控制器 (播放/暫停/進度條/切歌等)",
       "allowedSources": "允許搜尋的音樂來源",
       "sources": {
