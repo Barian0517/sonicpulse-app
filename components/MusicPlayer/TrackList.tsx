@@ -137,10 +137,12 @@ export const TrackList: React.FC<{
         }
     };
 
-    const formatTime = (sec: number) => {
-        const m = Math.floor(sec / 60);
-        const s = Math.floor(sec % 60);
-        return `${m}:${s.toString().padStart(2, '0')}`;
+    const formatTime = (time: number) => {
+        if (!time || isNaN(time)) return "0:00";
+        if (time > 10000) time = Math.floor(time / 1000);
+        const mins = Math.floor(time / 60);
+        const secs = Math.floor(time % 60);
+        return `${mins}:${secs.toString().padStart(2, '0')}`;
     };
 
     const handleContextMenu = (e: React.MouseEvent, track: Track) => {

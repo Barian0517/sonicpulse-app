@@ -11,6 +11,8 @@ import { NavidromeView } from './NavidromeView';
 import { NeteaseView } from './NeteaseView';
 import { MusicFreeView } from './MusicFreeView';
 import { useTranslation, Language } from '../../providers/I18nProvider';
+import { io, Socket } from 'socket.io-client';
+import QRCode from 'react-qr-code';
 
 export const MusicPlayerLayout: React.FC<{ 
     isOpen: boolean; 
@@ -35,7 +37,7 @@ export const MusicPlayerLayout: React.FC<{
     const [isSearching, setIsSearching] = useState(false);
     
     // Settings Tab State
-    const [activeSettingsTab, setActiveSettingsTab] = useState<'basic' | 'storage' | 'server'>('basic');
+    const [activeSettingsTab, setActiveSettingsTab] = useState<'basic' | 'storage' | 'server' | 'jukebox'>('basic');
     
     // Timeline Seek State
     const [localSeek, setLocalSeek] = useState<number | null>(null);
@@ -43,6 +45,19 @@ export const MusicPlayerLayout: React.FC<{
     const containerRef = useRef<HTMLDivElement>(null);
 
     const { t, language, setLanguage } = useTranslation();
+
+    // Jukebox State
+    const [jukeboxEnabled, setJukeboxEnabled] = useState(localStorage.getItem('jukebox_enabled') === 'true');
+    const [jukeboxPort, setJukeboxPort] = useState(localStorage.getItem('jukebox_port') || '8080');
+    const [jukeboxAllowPlayNext, setJukeboxAllowPlayNext] = useState(localStorage.getItem('jukebox_allow_play_next') !== 'false');
+    const [jukeboxAllowControl, setJukeboxAllowControl] = useState(localStorage.getItem('jukebox_allow_control') !== 'false');
+    const [jukeboxSources, setJukeboxSources] = useState<string[]>(
+        localStorage.getItem('jukebox_sources') 
+            ? JSON.parse(localStorage.getItem('jukebox_sources')!) 
+            : ['netease', 'navidrome', 'musicfree']
+    );
+    const [jukeboxSocket, setJukeboxSocket] = useState<Socket | null>(null);
+    const [lanIp, setLanIp] = useState<string>('');
 
     const handleSourceClick = (source: 'local' | 'navidrome' | 'netease' | 'musicfree' | 'settings') => {
         if (activeSource === source) {
@@ -316,6 +331,11 @@ export const MusicPlayerLayout: React.FC<{
                 url = await naviProvider.getStreamUrl(track.id);
             } else if (track.source === 'netease') {
                 url = await neteaseProvider.getStreamUrl(track.id);
+            } else if (track.source === 'musicfree') {
+                const mfProvider = new MusicFreeProvider();
+                // Need to restore the plugin ID if it was stashed
+                if ((track as any)._pluginId) mfProvider.pluginId = (track as any)._pluginId;
+                url = await mfProvider.getStreamUrl(track.id, track);
             }
         } catch (e: any) {
             console.error("Play error:", e);
@@ -425,6 +445,103 @@ export const MusicPlayerLayout: React.FC<{
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [queue, queueIndex]);
 
+    // --- Jukebox Host Logic ---
+    useEffect(() => {
+        if (!jukeboxEnabled) {
+            if (jukeboxSocket) {
+                jukeboxSocket.disconnect();
+                setJukeboxSocket(null);
+            }
+            // Ask plugin server to stop Jukebox
+            fetch('http://127.0.0.1:30001/jukebox/configure', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ enabled: false, port: parseInt(jukeboxPort) })
+            }).catch(console.error);
+            return;
+        }
+
+        // Start Jukebox server via plugin server
+        fetch('http://127.0.0.1:30001/jukebox/configure', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ enabled: true, port: parseInt(jukeboxPort) })
+        }).then(res => res.json()).then(data => {
+            if (data.success) {
+                // Fetch LAN IP
+                fetch('http://127.0.0.1:30001/ip')
+                    .then(res => res.json())
+                    .then(ipData => setLanIp(ipData.ip))
+                    .catch(console.error);
+                const socket = io(`http://127.0.0.1:${jukeboxPort}`);
+                setJukeboxSocket(socket);
+
+                socket.on('connect', () => {
+                    console.log('Jukebox Host Connected');
+                    socket.emit('register_host');
+                });
+
+                socket.on('client_command', async (cmd: any) => {
+                    console.log('Jukebox Command:', cmd);
+                    if (cmd.type === 'search') {
+                        let results: Track[] = [];
+                        try {
+                            if (cmd.source === 'netease' && jukeboxSources.includes('netease')) {
+                                results = (await neteaseProvider.search(cmd.query)).tracks;
+                            } else if (cmd.source === 'navidrome' && jukeboxSources.includes('navidrome')) {
+                                results = (await naviProvider.search(cmd.query)).tracks;
+                            } else if (cmd.source === 'musicfree' && jukeboxSources.includes('musicfree')) {
+                                try {
+                                    const disabledPlugins = JSON.parse(localStorage.getItem('sonicpulse_disabled_plugins') || '[]');
+                                    const allPlugins = await musicFreeProvider.getPlugins();
+                                    const enabledPluginIds = allPlugins.filter((p: any) => !disabledPlugins.includes(p.id)).map((p: any) => p.id);
+                                    results = (await musicFreeProvider.searchAll(cmd.query, enabledPluginIds)).tracks;
+                                } catch (e) {
+                                    console.error('MusicFree Jukebox search error:', e);
+                                    results = [];
+                                }
+                            }
+                        } catch (e) {
+                            console.error('Jukebox search error:', e);
+                        }
+                        socket.emit('host_search_results', { reqId: cmd.reqId, results });
+                    } else if (cmd.type === 'add_to_queue') {
+                        addToQueue([cmd.track]);
+                    } else if (cmd.type === 'play_next' && jukeboxAllowPlayNext) {
+                        playNext([cmd.track]);
+                    } else if (jukeboxAllowControl) {
+                        if (cmd.type === 'toggle_play') onTogglePlay();
+                        else if (cmd.type === 'seek') onSeek(cmd.time);
+                        else if (cmd.type === 'prev') handlePrev();
+                        else if (cmd.type === 'next') handleNext();
+                    }
+                });
+            }
+        }).catch(console.error);
+
+        return () => {
+            if (jukeboxSocket) jukeboxSocket.disconnect();
+        };
+    }, [jukeboxEnabled, jukeboxPort, jukeboxAllowPlayNext, jukeboxAllowControl, jukeboxSources]);
+
+    // Send state updates to Jukebox
+    useEffect(() => {
+        if (jukeboxSocket && jukeboxEnabled) {
+            jukeboxSocket.emit('host_state_update', {
+                isPlaying,
+                progress,
+                duration: playbackState.duration,
+                currentTrack,
+                queue,
+                permissions: {
+                    allowPlayNext: jukeboxAllowPlayNext,
+                    allowControl: jukeboxAllowControl,
+                    allowedSources: jukeboxSources
+                }
+            });
+        }
+    }, [isPlaying, progress, playbackState.duration, currentTrack, queue, jukeboxSocket, jukeboxEnabled, jukeboxAllowPlayNext, jukeboxAllowControl, jukeboxSources]);
+
     useEffect(() => {
         const onTrackEnded = () => handleNext();
         const onExtPlayNext = () => handleNext();
@@ -458,10 +575,12 @@ export const MusicPlayerLayout: React.FC<{
         onTogglePlay();
     };
 
-    const formatTime = (sec: number) => {
-        const m = Math.floor(sec / 60);
-        const s = Math.floor(sec % 60);
-        return `${m}:${s.toString().padStart(2, '0')}`;
+    const formatTime = (time: number) => {
+        if (!time || isNaN(time)) return "0:00";
+        if (time > 10000) time = Math.floor(time / 1000);
+        const mins = Math.floor(time / 60);
+        const secs = Math.floor(time % 60);
+        return `${mins}:${secs.toString().padStart(2, '0')}`;
     };
 
     const handleTimelineClick = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -692,6 +811,12 @@ export const MusicPlayerLayout: React.FC<{
                                     >
                                         <Server size={18} /> {t('settings.tabs.server')}
                                     </button>
+                                    <button 
+                                        onClick={() => setActiveSettingsTab('jukebox')}
+                                        className={`flex items-center gap-3 px-4 py-3 rounded-xl font-bold text-sm transition-all ${activeSettingsTab === 'jukebox' ? 'bg-pink-600/20 text-pink-400 border border-pink-500/30 shadow-[0_0_15px_rgba(236,72,153,0.1)]' : 'text-gray-400 hover:text-white hover:bg-white/5 border border-transparent'}`}
+                                    >
+                                        <Plug size={18} /> {t('settings.tabs.jukebox') || '線上點歌'}
+                                    </button>
                                 </div>
                                 {/* Settings Content */}
                                 <div className="flex-1 p-8 overflow-y-auto custom-scrollbar relative">
@@ -700,6 +825,7 @@ export const MusicPlayerLayout: React.FC<{
                                     
                                     {activeSettingsTab === 'basic' && (
                                         <div className="max-w-2xl animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                            {/* Language Settings */}
                                             <div className="bg-white/5 p-6 rounded-2xl border border-white/5 shadow-inner">
                                                 <h3 className="text-lg font-bold mb-4 flex items-center gap-2">🌐 {t('settings.language')}</h3>
                                                 <select 
@@ -712,6 +838,93 @@ export const MusicPlayerLayout: React.FC<{
                                                     <option value="ja" className="bg-[#151520] text-white">日本語</option>
                                                     <option value="en" className="bg-[#151520] text-white">English</option>
                                                 </select>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {activeSettingsTab === 'jukebox' && (
+                                        <div className="max-w-2xl animate-in fade-in slide-in-from-bottom-4 duration-500 flex flex-col gap-6">
+                                            {/* Jukebox Settings */}
+                                            <div className="bg-white/5 p-6 rounded-2xl border border-white/5 shadow-inner">
+                                                <h3 className="text-lg font-bold mb-4 flex items-center gap-2 text-purple-400">🔌 {t('settings.jukebox.title') || '線上點歌'}</h3>
+                                                
+                                                <label className="flex items-center gap-3 cursor-pointer mb-4">
+                                                    <div className={`w-12 h-6 rounded-full transition-colors relative ${jukeboxEnabled ? 'bg-purple-600' : 'bg-white/10'}`}>
+                                                        <div className={`absolute top-1 left-1 bg-white w-4 h-4 rounded-full transition-transform ${jukeboxEnabled ? 'translate-x-6' : ''}`} />
+                                                    </div>
+                                                    <span className="text-sm font-bold text-white">{t('settings.jukebox.enable') || '啟用線上點歌'}</span>
+                                                    <input type="checkbox" className="hidden" checked={jukeboxEnabled} onChange={(e) => {
+                                                        setJukeboxEnabled(e.target.checked);
+                                                        localStorage.setItem('jukebox_enabled', String(e.target.checked));
+                                                    }} />
+                                                </label>
+
+                                                {jukeboxEnabled && (
+                                                    <div className="mt-4 pt-4 border-t border-white/10 flex flex-col gap-6 animate-in fade-in zoom-in-95">
+                                                        
+                                                        {/* QR Code and Link */}
+                                                        {lanIp && (
+                                                            <div className="flex flex-col md:flex-row items-center gap-6 bg-black/20 p-6 rounded-xl border border-white/5">
+                                                                <div className="bg-white p-2 rounded-lg">
+                                                                    <QRCode value={`http://${lanIp}:${jukeboxPort}/jukebox.html`} size={120} />
+                                                                </div>
+                                                                <div className="flex flex-col flex-1">
+                                                                    <h4 className="font-bold text-white mb-2">邀請朋友來點歌！</h4>
+                                                                    <p className="text-sm text-gray-400 mb-3">請他們連接相同的 Wi-Fi，然後掃描左側條碼，或直接在瀏覽器輸入以下網址：</p>
+                                                                    <a href={`http://${lanIp}:${jukeboxPort}/jukebox.html`} target="_blank" rel="noreferrer" className="text-purple-400 font-mono text-sm hover:underline p-2 bg-white/5 rounded-lg text-center break-all">
+                                                                        http://{lanIp}:{jukeboxPort}/jukebox.html
+                                                                    </a>
+                                                                </div>
+                                                            </div>
+                                                        )}
+
+                                                        <div>
+                                                            <label className="text-xs text-gray-400 block mb-1">{t('settings.jukebox.port') || '端口'}</label>
+                                                            <input type="number" value={jukeboxPort} onChange={e => {
+                                                                setJukeboxPort(e.target.value);
+                                                                localStorage.setItem('jukebox_port', e.target.value);
+                                                            }} className="bg-[#151520] border border-white/10 rounded-lg px-3 py-2 text-sm w-32 focus:border-purple-500 outline-none" />
+                                                        </div>
+
+                                                        <div className="bg-black/20 p-4 rounded-xl border border-white/5 flex flex-col gap-3">
+                                                            <h4 className="text-sm font-bold text-gray-300 mb-1">{t('settings.jukebox.permissions') || '權限'}</h4>
+                                                            <label className="flex items-center gap-2 cursor-pointer">
+                                                                <input type="checkbox" checked={jukeboxAllowPlayNext} onChange={e => {
+                                                                    setJukeboxAllowPlayNext(e.target.checked);
+                                                                    localStorage.setItem('jukebox_allow_play_next', String(e.target.checked));
+                                                                }} className="accent-purple-500" />
+                                                                <span className="text-sm text-gray-300">{t('settings.jukebox.allowPlayNext') || '允許插播'}</span>
+                                                            </label>
+                                                            <label className="flex items-center gap-2 cursor-pointer">
+                                                                <input type="checkbox" checked={jukeboxAllowControl} onChange={e => {
+                                                                    setJukeboxAllowControl(e.target.checked);
+                                                                    localStorage.setItem('jukebox_allow_control', String(e.target.checked));
+                                                                }} className="accent-purple-500" />
+                                                                <span className="text-sm text-gray-300">{t('settings.jukebox.allowControl') || '允許操作播放控制器'}</span>
+                                                            </label>
+                                                        </div>
+
+                                                        <div className="bg-black/20 p-4 rounded-xl border border-white/5 flex flex-col gap-3">
+                                                            <h4 className="text-sm font-bold text-gray-300 mb-1">{t('settings.jukebox.allowedSources') || '允許搜尋來源'}</h4>
+                                                            {['netease', 'navidrome', 'musicfree'].map(source => (
+                                                                <label key={source} className="flex items-center gap-2 cursor-pointer">
+                                                                    <input type="checkbox" checked={jukeboxSources.includes(source)} onChange={e => {
+                                                                        const newSources = e.target.checked 
+                                                                            ? [...jukeboxSources, source] 
+                                                                            : jukeboxSources.filter(s => s !== source);
+                                                                        setJukeboxSources(newSources);
+                                                                        localStorage.setItem('jukebox_sources', JSON.stringify(newSources));
+                                                                    }} className="accent-purple-500" />
+                                                                    <span className="text-sm text-gray-300">
+                                                                        {source === 'netease' ? (t('settings.jukebox.sources.netease') || '網易雲音樂') : 
+                                                                         source === 'navidrome' ? 'Navidrome' : 
+                                                                         (t('settings.jukebox.sources.musicfree') || 'MusicFree 插件')}
+                                                                    </span>
+                                                                </label>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
                                     )}

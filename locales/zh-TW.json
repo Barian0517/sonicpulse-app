@@ -37,7 +37,22 @@
     "tabs": {
       "basic": "基礎設定",
       "storage": "儲存與路徑",
-      "server": "伺服器與帳號"
+      "server": "伺服器與帳號",
+      "jukebox": "線上點歌"
+    },
+    "jukebox": {
+      "title": "線上點歌 (Jukebox)",
+      "enable": "啟用線上點歌",
+      "port": "網站端口 (Port)",
+      "permissions": "權限設定",
+      "allowPlayNext": "允許插播 (加入到下一首)",
+      "allowControl": "允許操作播放控制器 (播放/暫停/進度條/切歌等)",
+      "allowedSources": "允許搜尋的音樂來源",
+      "sources": {
+        "netease": "網易雲音樂",
+        "navidrome": "Navidrome",
+        "musicfree": "MusicFree 插件"
+      }
     },
     "language": "顯示語言 (Language)",
     "localLibrary": "本地音樂庫",

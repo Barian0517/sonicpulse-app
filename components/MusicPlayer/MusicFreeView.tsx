@@ -18,19 +18,23 @@ export const MusicFreeView: React.FC<{
     const [isSearching, setIsSearching] = useState(false);
     const [searchResults, setSearchResults] = useState<Track[]>([]);
     const [activeTab, setActiveTab] = useState<'search' | 'history' | 'favorites' | 'playlists' | 'plugins'>('search');
-    
+
     // Favorites and History states
     const [favorites, setFavorites] = useState<Track[]>([]);
     const [history, setHistory] = useState<Track[]>([]);
+    const [disabledPlugins, setDisabledPlugins] = useState<string[]>(() => {
+        try { return JSON.parse(localStorage.getItem('sonicpulse_disabled_plugins') || '[]'); } catch { return []; }
+    });
     const { t } = useTranslation();
+
+    const enabledPlugins = plugins.filter(p => !disabledPlugins.includes(p.id));
 
     const loadPlugins = async () => {
         try {
             const list = await provider.getPlugins();
             setPlugins(list);
             if (list.length > 0 && !selectedPluginId) {
-                setSelectedPluginId(list[0].id);
-                provider.setPlugin(list[0].id);
+                setSelectedPluginId('all');
             }
         } catch (e) {
             console.error("Failed to load MusicFree plugins", e);
@@ -50,7 +54,7 @@ export const MusicFreeView: React.FC<{
         try {
             const raw = localStorage.getItem('sonicpulse_musicfree_history');
             if (raw) setHistory(JSON.parse(raw));
-        } catch(e) {}
+        } catch (e) { }
     };
 
     useEffect(() => {
@@ -69,11 +73,17 @@ export const MusicFreeView: React.FC<{
             loadFavorites();
         };
 
+        const handleDisabledChanged = (e: any) => {
+            setDisabledPlugins(e.detail || []);
+        };
+
         window.addEventListener('sonicpulse-reload-source', handleReload);
         window.addEventListener('sonicpulse-liked-songs-updated', handleLikedUpdated);
+        window.addEventListener('sonicpulse-disabled-plugins-changed', handleDisabledChanged);
         return () => {
             window.removeEventListener('sonicpulse-reload-source', handleReload);
             window.removeEventListener('sonicpulse-liked-songs-updated', handleLikedUpdated);
+            window.removeEventListener('sonicpulse-disabled-plugins-changed', handleDisabledChanged);
         };
     }, [provider]);
 
@@ -89,14 +99,14 @@ export const MusicFreeView: React.FC<{
         setIsSearching(true);
         try {
             if (selectedPluginId === 'all') {
-                const pluginIds = plugins.map(p => p.id);
+                const pluginIds = enabledPlugins.map(p => p.id);
                 const res = await provider.searchAll(query.trim(), pluginIds);
                 setSearchResults(res.tracks || []);
             } else {
                 const res = await provider.search(query.trim());
                 setSearchResults(res.tracks || []);
             }
-        } catch(e) {
+        } catch (e) {
             console.error("MusicFree search failed", e);
             setSearchResults([]);
         } finally {
@@ -133,7 +143,7 @@ export const MusicFreeView: React.FC<{
             const newHist = [track, ...hist.filter(t => t.id !== track.id)].slice(0, 100);
             localStorage.setItem('sonicpulse_musicfree_history', JSON.stringify(newHist));
             setHistory(newHist);
-        } catch(e) {}
+        } catch (e) { }
     };
 
     // Auto-search when query changes
@@ -144,11 +154,12 @@ export const MusicFreeView: React.FC<{
         return () => clearTimeout(timeout);
     }, [searchQuery, selectedPluginId, activeTab, plugins]);
 
-    const formatTime = (sec: number) => {
-        if (!sec) return '--:--';
-        const m = Math.floor(sec / 60);
-        const s = Math.floor(sec % 60);
-        return `${m}:${s.toString().padStart(2, '0')}`;
+    const formatTime = (time: number) => {
+        if (!time || isNaN(time)) return "0:00";
+        if (time > 10000) time = Math.floor(time / 1000);
+        const mins = Math.floor(time / 60);
+        const secs = Math.floor(time % 60);
+        return `${mins}:${secs.toString().padStart(2, '0')}`;
     };
 
     const renderTrackList = (tracks: Track[], emptyIcon: React.ReactNode, emptyMessage: string) => {
@@ -164,11 +175,11 @@ export const MusicFreeView: React.FC<{
         return (
             <div className="flex flex-col gap-2 pb-32">
                 {tracks.map((track, idx) => (
-                    <div 
+                    <div
                         key={track.id + idx}
                         className={`group flex items-center gap-4 p-3 rounded-xl transition-all duration-300 border ${currentTrackId === track.id ? 'bg-purple-500/20 border-purple-500/40 shadow-[0_0_20px_rgba(168,85,247,0.15)]' : 'bg-black/20 border-white/5 hover:bg-white/5 hover:border-white/10'}`}
                     >
-                        <div 
+                        <div
                             className="relative w-12 h-12 bg-white/5 rounded-lg overflow-hidden shrink-0 flex items-center justify-center shadow-inner cursor-pointer"
                             onClick={() => handlePlayTrack(tracks, idx)}
                         >
@@ -192,7 +203,9 @@ export const MusicFreeView: React.FC<{
                         <div className="flex-1 min-w-0" onDoubleClick={() => handlePlayTrack(tracks, idx)}>
                             <div className={`font-bold text-base truncate mb-1 ${currentTrackId === track.id ? 'text-purple-300' : 'text-white group-hover:text-purple-200'} transition-colors`}>{track.title}</div>
                             <div className="flex items-center gap-2">
-                                <span className="text-[10px] text-purple-400 border border-purple-400/30 px-1 rounded uppercase tracking-wider shrink-0 font-bold bg-purple-400/10">MUSICFREE</span>
+                                <span className="text-[10px] text-purple-400 border border-purple-400/30 px-1 rounded uppercase tracking-wider shrink-0 font-bold bg-purple-400/10">
+                                    {((track as any)._pluginId && plugins.find(p => p.id === (track as any)._pluginId)?.platform) || 'MUSICFREE'}
+                                </span>
                                 <span className="text-sm text-gray-400 truncate">{track.artist}</span>
                             </div>
                         </div>
@@ -223,28 +236,28 @@ export const MusicFreeView: React.FC<{
                 </div>
 
                 <div className="flex flex-col gap-1 flex-1">
-                    <button 
+                    <button
                         onClick={() => setActiveTab('search')}
                         className={`flex items-center gap-3 px-4 py-2.5 rounded-xl font-medium transition-all ${activeTab === 'search' ? 'bg-purple-500 text-white shadow-[0_0_20px_rgba(168,85,247,0.3)]' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
                     >
                         <Search size={18} />
                         {t('musicfree.searchMusic')}
                     </button>
-                    <button 
+                    <button
                         onClick={() => setActiveTab('history')}
                         className={`flex items-center gap-3 px-4 py-2.5 rounded-xl font-medium transition-all ${activeTab === 'history' ? 'bg-purple-500 text-white shadow-[0_0_20px_rgba(168,85,247,0.3)]' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
                     >
                         <Clock size={18} />
                         {t('musicfree.playHistory')}
                     </button>
-                    <button 
+                    <button
                         onClick={() => setActiveTab('favorites')}
                         className={`flex items-center gap-3 px-4 py-2.5 rounded-xl font-medium transition-all ${activeTab === 'favorites' ? 'bg-purple-500 text-white shadow-[0_0_20px_rgba(168,85,247,0.3)]' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
                     >
                         <Heart size={18} />
                         {t('musicfree.favorites')}
                     </button>
-                    <button 
+                    <button
                         onClick={() => setActiveTab('playlists')}
                         className={`flex items-center gap-3 px-4 py-2.5 rounded-xl font-medium transition-all ${activeTab === 'playlists' ? 'bg-purple-500 text-white shadow-[0_0_20px_rgba(168,85,247,0.3)]' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
                     >
@@ -253,9 +266,25 @@ export const MusicFreeView: React.FC<{
                     </button>
                 </div>
 
+                <div className="mt-4 px-3 mb-2">
+                    <div className="bg-orange-500/10 border border-orange-500/20 rounded-xl p-3 shadow-[0_4px_20px_rgba(249,115,22,0.05)]">
+                        <div className="flex items-center gap-2 mb-2 flex-wrap">
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-500/20 text-blue-400 border border-blue-500/30">
+                                Beta
+                            </span>
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-500/20 text-red-400 border border-red-500/30">
+                                暫停維護
+                            </span>
+                        </div>
+                        <p className="text-xs text-orange-200/70 leading-relaxed">
+                            💡 目前僅有<strong className="text-orange-200 font-bold mx-1">網易雲 aduiomack</strong>與<strong className="text-orange-200 font-bold mx-1">Bilibili</strong>插件較為穩定，其它插件可能無法正常播放。
+                        </p>
+                    </div>
+                </div>
+
                 <div className="h-px bg-white/10 my-2" />
 
-                <button 
+                <button
                     onClick={() => setActiveTab('plugins')}
                     className={`flex items-center gap-3 px-4 py-2.5 rounded-xl font-medium transition-all ${activeTab === 'plugins' ? 'bg-blue-500 text-white shadow-[0_0_20px_rgba(59,130,246,0.3)]' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
                 >
@@ -273,13 +302,13 @@ export const MusicFreeView: React.FC<{
                             <div className="flex items-center gap-4">
                                 <div className="flex items-center bg-black/40 border border-white/10 rounded-xl px-4 py-2 backdrop-blur-md">
                                     <Plug size={16} className="text-gray-400 mr-2" />
-                                    <select 
+                                    <select
                                         value={selectedPluginId}
                                         onChange={handlePluginChange}
                                         className="bg-transparent text-sm font-bold text-white outline-none appearance-none cursor-pointer pr-4"
                                     >
-                                        <option value="all" className="bg-[#1e1e2e] text-purple-400 font-bold">🌟 {t('musicfree.allPlugins')}</option>
-                                        {plugins.map(p => (
+                                        <option value="all" className="bg-black text-white">{t('musicfree.allPlugins')}</option>
+                                        {enabledPlugins.map(p => (
                                             <option key={p.id} value={p.id} className="bg-[#1e1e2e] text-white">
                                                 {p.platform} (v{p.version})
                                             </option>
@@ -294,12 +323,18 @@ export const MusicFreeView: React.FC<{
                                         onChange={(e) => setSearchQuery(e.target.value)}
                                         onKeyDown={(e) => {
                                             if (e.key === 'Enter') {
+                                                e.preventDefault();
                                                 performSearch(searchQuery);
                                             }
                                         }}
-                                        className="w-full bg-black/40 border border-white/10 rounded-xl px-10 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-purple-500/50 transition-all backdrop-blur-md"
+                                        className="w-full bg-black/40 border border-white/10 rounded-xl pl-10 pr-10 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-purple-500/50 transition-all backdrop-blur-md"
                                     />
-                                    <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+                                    <button 
+                                        onClick={() => performSearch(searchQuery)}
+                                        className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white transition-colors"
+                                    >
+                                        <Search size={16} />
+                                    </button>
                                     {isSearching && <Loader2 size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-purple-400 animate-spin" />}
                                 </div>
                             </div>

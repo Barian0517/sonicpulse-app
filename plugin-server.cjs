@@ -5,16 +5,40 @@ const path = require('path');
 const vm = require('vm');
 const axios = require('axios');
 const crypto = require('crypto');
+const http = require('http');
+const { Server } = require('socket.io');
+const os = require('os');
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
+app.get('/ip', (req, res) => {
+    const interfaces = os.networkInterfaces();
+    let fallbackIp = null;
+    for (const devName in interfaces) {
+        const iface = interfaces[devName];
+        for (let i = 0; i < iface.length; i++) {
+            const alias = iface[i];
+            if (alias.family === 'IPv4' && alias.address !== '127.0.0.1' && !alias.internal) {
+                // Prioritize standard local LAN ranges
+                if (alias.address.startsWith('192.168.') || 
+                    alias.address.startsWith('10.') || 
+                    alias.address.match(/^172\.(1[6-9]|2\d|3[0-1])\./)) {
+                    return res.json({ ip: alias.address });
+                }
+                if (!fallbackIp) fallbackIp = alias.address;
+            }
+        }
+    }
+    res.json({ ip: fallbackIp || '127.0.0.1' });
+});
+
 process.on('unhandledRejection', (reason, promise) => {
-    console.error('Unhandled Rejection from a plugin:', reason);
+    console.error('Unhandled Rejection from a plugin:', reason instanceof Error ? reason.message : reason);
 });
 process.on('uncaughtException', (err) => {
-    console.error('Uncaught Exception from a plugin:', err);
+    console.error('Uncaught Exception from a plugin:', err instanceof Error ? err.message : err);
 });
 
 const configPath = path.join(__dirname, 'musicfree-config.json');
@@ -55,6 +79,17 @@ function loadPlugin(filePath) {
             },
             require: function(moduleName) {
                 // Map the module name to our project's node_modules
+                if (moduleName === 'axios') {
+                    const axiosInst = require('axios').create({
+                        headers: {
+                            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36',
+                            'Accept': '*/*'
+                        }
+                    });
+                    // Some plugins might use axios.default or rely on it being the module itself
+                    axiosInst.default = axiosInst;
+                    return axiosInst;
+                }
                 try {
                     return require(moduleName);
                 } catch(e) {
@@ -70,7 +105,13 @@ function loadPlugin(filePath) {
             clearInterval: clearInterval,
             Buffer: Buffer,
             process: process,
-            URL: URL
+            URL: URL,
+            btoa: (str) => Buffer.from(str, 'binary').toString('base64'),
+            atob: (b64) => Buffer.from(b64, 'base64').toString('binary'),
+            encodeURIComponent: encodeURIComponent,
+            decodeURIComponent: decodeURIComponent,
+            escape: escape,
+            unescape: unescape
         };
         sandbox.exports = sandbox.module.exports;
         
@@ -210,6 +251,57 @@ app.post('/plugin/uninstall', (req, res) => {
 app.post('/plugin/variables', (req, res) => {
     const { id, variables } = req.body;
     const cfg = getConfig();
+    if (!cfg.pluginVariables) cfg.pluginVariables = {};
+    cfg.pluginVariables[id] = variables;
+    saveConfig(cfg);
+    res.json({ success: true });
+});
+
+// API: Proxy audio stream with custom headers
+app.get('/plugin/proxy', async (req, res) => {
+    const targetUrl = req.query.url;
+    if (!targetUrl) return res.status(400).send("Missing url");
+
+    let customHeaders = {};
+    if (req.query.headers) {
+        try { customHeaders = JSON.parse(req.query.headers); } catch (e) {}
+    }
+    
+    // Forward Range header for seeking support
+    if (req.headers.range) {
+        customHeaders['range'] = req.headers.range;
+    }
+
+    try {
+        const proxyRes = await axios({
+            method: 'get',
+            url: targetUrl,
+            headers: customHeaders,
+            responseType: 'stream',
+            validateStatus: () => true // allow any status
+        });
+        
+        res.status(proxyRes.status);
+        
+        for (const [key, value] of Object.entries(proxyRes.headers)) {
+            if (key.toLowerCase() !== 'transfer-encoding') {
+                try {
+                    res.setHeader(key, value);
+                } catch(e) {}
+            }
+        }
+        
+        proxyRes.data.pipe(res);
+    } catch (e) {
+        console.error("Proxy error:", e.message);
+        res.status(500).end();
+    }
+});
+
+// API: Call plugin method
+app.post('/plugin/variables', (req, res) => {
+    const { id, variables } = req.body;
+    const cfg = getConfig();
     if (!cfg.variables) cfg.variables = {};
     cfg.variables[id] = variables;
     saveConfig(cfg);
@@ -235,6 +327,88 @@ app.post('/plugin/call', async (req, res) => {
     } catch(e) {
         console.error(`Error executing ${method} on plugin ${id}:`, e);
         res.status(500).json({ error: e.message || String(e) });
+    }
+});
+
+// --- Jukebox System ---
+let jukeboxServer = null;
+let jukeboxIo = null;
+let hostSocket = null;
+
+// Serve the Jukebox frontend files
+app.use('/jukebox', express.static(path.join(__dirname, 'dist-jukebox')));
+
+// Configure Jukebox API (called by Tauri Host)
+app.post('/jukebox/configure', (req, res) => {
+    const { enabled, port } = req.body;
+    
+    // Stop existing server if any
+    if (jukeboxServer) {
+        jukeboxServer.close();
+        jukeboxServer = null;
+        jukeboxIo = null;
+    }
+
+    if (enabled && port) {
+        const jukeboxApp = express();
+        jukeboxApp.use(cors());
+        
+        const distPath = path.join(__dirname, 'dist');
+        jukeboxApp.use(express.static(distPath));
+        
+        jukeboxApp.use((req, res) => {
+            if (!fs.existsSync(path.join(distPath, 'jukebox.html'))) {
+                const separator = req.originalUrl.includes('?') ? '&' : '?';
+                return res.redirect(`http://${req.hostname}:3000${req.originalUrl}${separator}wsPort=${port}`);
+            }
+            res.sendFile(path.join(distPath, 'jukebox.html'));
+        });
+
+        jukeboxServer = http.createServer(jukeboxApp);
+        jukeboxIo = new Server(jukeboxServer, {
+            cors: { origin: '*' }
+        });
+
+        jukeboxIo.on('connection', (socket) => {
+            console.log('Jukebox client connected:', socket.id);
+            
+            socket.on('register_host', () => {
+                console.log('Host registered:', socket.id);
+                hostSocket = socket;
+                
+                socket.on('disconnect', () => {
+                    if (hostSocket === socket) hostSocket = null;
+                });
+            });
+
+            // Route messages from web client to host
+            socket.on('client_command', (cmd) => {
+                if (hostSocket) {
+                    hostSocket.emit('client_command', cmd);
+                } else {
+                    socket.emit('error', { message: 'Host not connected' });
+                }
+            });
+
+            // Route state from host to all web clients
+            socket.on('host_state_update', (state) => {
+                if (socket === hostSocket) {
+                    socket.broadcast.emit('state_update', state);
+                }
+            });
+        });
+
+        try {
+            jukeboxServer.listen(port, '0.0.0.0', () => {
+                console.log(`Jukebox server running on http://0.0.0.0:${port}`);
+            });
+            res.json({ success: true, message: `Started on port ${port}` });
+        } catch (e) {
+            console.error('Error starting Jukebox server:', e);
+            res.status(500).json({ error: e.toString() });
+        }
+    } else {
+        res.json({ success: true, message: 'Jukebox server stopped' });
     }
 });
 

@@ -12,7 +12,21 @@ export const MusicFreePluginManager: React.FC<{ provider: any }> = ({ provider }
     // For Variables modal
     const [activePlugin, setActivePlugin] = useState<any>(null);
     const [variables, setVariables] = useState<Record<string, string>>({});
+    
+    // For Disabled plugins
+    const [disabledPlugins, setDisabledPlugins] = useState<string[]>(() => {
+        try { return JSON.parse(localStorage.getItem('sonicpulse_disabled_plugins') || '[]'); } catch { return []; }
+    });
     const { t } = useTranslation();
+
+    const togglePlugin = (id: string) => {
+        const newDisabled = disabledPlugins.includes(id) 
+            ? disabledPlugins.filter(p => p !== id) 
+            : [...disabledPlugins, id];
+        setDisabledPlugins(newDisabled);
+        localStorage.setItem('sonicpulse_disabled_plugins', JSON.stringify(newDisabled));
+        window.dispatchEvent(new CustomEvent('sonicpulse-disabled-plugins-changed', { detail: newDisabled }));
+    };
 
     const loadPlugins = async () => {
         setIsLoading(true);
@@ -167,6 +181,7 @@ export const MusicFreePluginManager: React.FC<{ provider: any }> = ({ provider }
                                 <th className="py-3 px-4 font-normal">來源 (ID)</th>
                                 <th className="py-3 px-4 font-normal">版本號</th>
                                 <th className="py-3 px-4 font-normal">作者</th>
+                                <th className="py-3 px-4 font-normal">狀態</th>
                                 <th className="py-3 px-4 font-normal">操作</th>
                             </tr>
                         </thead>
@@ -180,6 +195,14 @@ export const MusicFreePluginManager: React.FC<{ provider: any }> = ({ provider }
                                     </td>
                                     <td className="py-3 px-4 text-gray-400">{p.version || '-'}</td>
                                     <td className="py-3 px-4 text-gray-400 text-sm max-w-[150px] truncate" title={p.author}>{p.author || '-'}</td>
+                                    <td className="py-3 px-4">
+                                        <button 
+                                            onClick={() => togglePlugin(p.id)}
+                                            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${disabledPlugins.includes(p.id) ? 'bg-gray-600' : 'bg-green-500'}`}
+                                        >
+                                            <span className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${disabledPlugins.includes(p.id) ? 'translate-x-1' : 'translate-x-5'}`} />
+                                        </button>
+                                    </td>
                                     <td className="py-3 px-4">
                                         <div className="flex items-center gap-3 opacity-50 group-hover:opacity-100 transition-opacity">
                                             {p.srcUrl && (

@@ -85,17 +85,24 @@ export class MusicFreeProvider implements MusicProvider {
         
         let tracks: Track[] = [];
         if (result && result.data && Array.isArray(result.data)) {
-            tracks = result.data.map((item: any) => ({
-                id: String(item.id),
-                title: item.title,
-                artist: item.artist,
-                album: item.album,
-                duration: item.duration || 0,
-                coverUrl: item.artwork || item.pic || item.cover,
-                source: 'musicfree',
-                pluginItem: item,
-                _pluginId: this.pluginId
-            }));
+            tracks = result.data.map((item: any) => {
+                let duration = item.duration || 0;
+                // If duration is extremely large (e.g. > 36000, which is 10 hours), it's probably in milliseconds
+                if (duration > 36000) {
+                    duration = Math.floor(duration / 1000);
+                }
+                return {
+                    id: String(item.id),
+                    title: item.title,
+                    artist: item.artist,
+                    album: item.album,
+                    duration: duration,
+                    coverUrl: item.artwork || item.pic || item.cover,
+                    source: 'musicfree',
+                    pluginItem: item,
+                    _pluginId: this.pluginId
+                };
+            });
         }
         
         return { artists: [], albums: [], tracks };
@@ -116,17 +123,21 @@ export class MusicFreeProvider implements MusicProvider {
                 if (!res.ok) return [];
                 const data = await res.json();
                 if (data && data.data && data.data.data && Array.isArray(data.data.data)) {
-                    return data.data.data.map((item: any) => ({
-                        id: String(item.id),
-                        title: item.title,
-                        artist: item.artist,
-                        album: item.album,
-                        duration: item.duration || 0,
-                        coverUrl: item.artwork || item.pic || item.cover,
-                        source: 'musicfree',
-                        pluginItem: item,
-                        _pluginId: id
-                    }));
+                    return data.data.data.map((item: any) => {
+                        let duration = item.duration || 0;
+                        if (duration > 36000) duration = Math.floor(duration / 1000);
+                        return {
+                            id: String(item.id),
+                            title: item.title,
+                            artist: item.artist,
+                            album: item.album,
+                            duration: duration,
+                            coverUrl: item.artwork || item.pic || item.cover,
+                            source: 'musicfree',
+                            pluginItem: item,
+                            _pluginId: id
+                        };
+                    });
                 }
                 return [];
             } catch (e) {
@@ -197,8 +208,14 @@ export class MusicFreeProvider implements MusicProvider {
         try {
             const res = await this.callPlugin('getMediaSource', [trackInfo.pluginItem, quality]);
             if (res && res.url) {
-                return res.url;
+                let proxyUrl = `http://127.0.0.1:30001/plugin/proxy?url=${encodeURIComponent(res.url)}`;
+                if (res.headers && Object.keys(res.headers).length > 0) {
+                    proxyUrl += `&headers=${encodeURIComponent(JSON.stringify(res.headers))}`;
+                }
+                return proxyUrl;
             }
+        } catch (e) {
+            console.error("Failed getStreamUrl for plugin", this.pluginId, e);
         } finally {
             this.pluginId = originalId;
         }
