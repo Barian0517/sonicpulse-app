@@ -22,6 +22,8 @@ interface PlayerProps {
   onStartRoaming?: (track: any) => void;
   onLikeTrack?: (track: any) => void;
   isLiked?: boolean;
+  onClearPlaylist?: () => void;
+  onRemoveTrack?: (index: number) => void;
 }
 
 import { Compass, Heart as HeartIcon, Plus } from 'lucide-react';
@@ -51,7 +53,9 @@ const Player: React.FC<PlayerProps> = ({
   onToggleRoaming,
   onStartRoaming,
   onLikeTrack,
-  isLiked = false
+  isLiked = false,
+  onClearPlaylist,
+  onRemoveTrack
 }) => {
   const [isHovering, setIsHovering] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
@@ -376,11 +380,22 @@ const Player: React.FC<PlayerProps> = ({
 
                 {/* PLAYLIST VIEW */}
                 <div className={`absolute inset-0 flex flex-col transition-all duration-500 ${showPlaylist ? 'opacity-100 pointer-events-auto scale-100 delay-200' : 'opacity-0 pointer-events-none scale-105'}`}>
+                    <div className="flex justify-between items-center mb-2 px-1">
+                        <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">{isRoamingMode ? '漫遊序列' : '撥放序列'} ({playlist.length})</span>
+                        {playlist.length > 0 && onClearPlaylist && (
+                            <button 
+                                onClick={(e) => { e.stopPropagation(); onClearPlaylist(); }}
+                                className="text-xs font-bold text-gray-500 hover:text-white px-3 py-1 rounded-full border border-gray-600 hover:bg-white/10 hover:border-white/20 transition-all active:scale-95"
+                            >
+                                清空序列
+                            </button>
+                        )}
+                    </div>
                     <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 flex flex-col gap-1 -mx-2 px-2">
                         {playlist.length === 0 && (
                             <div className="h-full flex flex-col items-center justify-center text-gray-500 gap-3">
                                 <List size={48} className="opacity-20" />
-                                <p className="text-sm font-medium">Playlist is empty</p>
+                                <p className="text-sm font-medium">播放序列是空的</p>
                             </div>
                         )}
                         {playlist.map((item, idx) => (
@@ -409,8 +424,17 @@ const Player: React.FC<PlayerProps> = ({
                                     <h4 className={`text-sm font-bold truncate ${idx === currentIndex ? 'text-white' : 'group-hover/item:text-white transition-colors'}`}>{item.track?.title || item.name}</h4>
                                     <p className="text-xs text-purple-300/40 truncate">{item.track?.artist || 'Unknown Artist'}</p>
                                 </div>
-                                <div className="text-xs text-purple-400/60 font-mono">
-                                    {item.track?.duration ? formatTime(item.track.duration) : ''}
+                                <div className="text-xs text-purple-400/60 font-mono flex items-center gap-2">
+                                    <span className="group-hover/item:hidden">{item.track?.duration ? formatTime(item.track.duration) : ''}</span>
+                                    {onRemoveTrack && (
+                                        <button 
+                                            onClick={(e) => { e.stopPropagation(); onRemoveTrack(idx); }}
+                                            className="hidden group-hover/item:flex text-gray-400 hover:text-red-400 p-1 rounded-full hover:bg-white/10 transition-colors"
+                                            title="移除"
+                                        >
+                                            <X size={14} />
+                                        </button>
+                                    )}
                                 </div>
                             </div>
                         ))}

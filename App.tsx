@@ -8,6 +8,8 @@ import { LyricsOverlay } from './components/LyricsOverlay';
 import { MusicPlayerLayout } from './components/MusicPlayer/MusicPlayerLayout';
 import { NeteaseProvider } from './providers/NeteaseProvider';
 import { MusicFreeProvider } from './providers/MusicFreeProvider';
+import { LocalProvider } from './providers/LocalProvider';
+import { NavidromeProvider } from './providers/NavidromeProvider';
 import { VisualizerConfig, VisualizerShape, VisualizerDirection, VisualizerStyle, SymmetryMode, AudioSourceState, VisualizerMaterial, VisualizerParticleEffect } from './types';
 import { Track } from './providers/MusicProvider';
 import { translations, Language } from './translations';
@@ -1423,29 +1425,106 @@ const App: React.FC = () => {
                 }
             }}
             onLikeTrack={async (track) => {
-                if (track.source !== 'netease') {
-                    showToast("只有網易雲音樂的歌曲可以加入紅心");
-                    return;
-                }
                 try {
-                    const provider = new NeteaseProvider();
-                    // Toggle like state: if already liked, unlike it.
-                    const currentlyLiked = track ? likedIds.has(track.id) : false;
-                    const ok = await provider.likeSong(track.id, !currentlyLiked);
-                    if (ok) {
-                        showToast(!currentlyLiked ? "已加入紅心歌曲！" : "已取消紅心！");
-                        window.dispatchEvent(new CustomEvent('sonicpulse-liked-songs-updated'));
+                    const currentlyLiked = track ? likedIds.has(track.id) : (track?.isStarred || false);
+                    
+                    if (track.source === 'netease') {
+                        const provider = new NeteaseProvider();
+                        const ok = await provider.likeSong(track.id, !currentlyLiked);
+                        if (!ok) {
+                            showToast("操作失敗，請確認網易雲登入狀態。");
+                            return;
+                        }
+                        const ids = new Set((window as any).__sonicpulse_liked_ids || []);
+                        if (!currentlyLiked) ids.add(track.id);
+                        else ids.delete(track.id);
+                        (window as any).__sonicpulse_liked_ids = Array.from(ids);
+                    } else if (track.source === 'musicfree') {
+                        const provider = new MusicFreeProvider();
+                        await provider.toggleStarTrack(track);
+                        const ids = new Set((window as any).__sonicpulse_liked_ids || []);
+                        if (!currentlyLiked) ids.add(track.id);
+                        else ids.delete(track.id);
+                        (window as any).__sonicpulse_liked_ids = Array.from(ids);
+                    } else if (track.source === 'navidrome' || track.source === 'local') {
+                        const provider = track.source === 'local' ? new LocalProvider() : new NavidromeProvider();
+                        await provider.star(track.id, 'track', !currentlyLiked);
+                        // Update track.isStarred optimistically since it might be accessed directly
+                        if (track) track.isStarred = !currentlyLiked;
                     } else {
-                        showToast("操作失敗，請確認網易雲登入狀態。");
+                        showToast("此來源不支援加入紅心");
+                        return;
                     }
+
+                    showToast(!currentlyLiked ? "已加入紅心歌曲！" : "已取消紅心！");
+                    window.dispatchEvent(new CustomEvent('sonicpulse-liked-songs-updated'));
                 } catch(e: any) { 
                     showToast("加入失敗: " + e.message);
                 }
             }}
             isLiked={(() => {
                 const tr = isRoamingMode ? roamPlaylist[roamTrackIndex]?.track : mainPlaylist[mainTrackIndex]?.track;
-                return tr ? likedIds.has(tr.id) : false;
+                if (!tr) return false;
+                if (tr.source === 'netease' || tr.source === 'musicfree') {
+                    return likedIds.has(tr.id);
+                }
+                return tr.isStarred || false;
             })()}
+            onClearPlaylist={() => {
+                if (isRoamingMode) {
+                    setRoamPlaylist([]);
+                    setRoamTrackIndex(-1);
+                    setIsRoamingMode(false);
+                } else {
+                    setMainPlaylist([]);
+                    setMainTrackIndex(-1);
+                    if (isExternalQueue) {
+                        window.dispatchEvent(new CustomEvent('sonicpulse-clear-queue'));
+                    }
+                }
+                if (audioState.mode === 'file') {
+                    const player = getActivePlayer();
+                    if (player) player.pause();
+                    setAudioState(prev => ({ ...prev, isPlaying: false, fileName: '' }));
+                }
+            }}
+            onRemoveTrack={(index) => {
+                if (isRoamingMode) {
+                    const newList = [...roamPlaylist];
+                    newList.splice(index, 1);
+                    setRoamPlaylist(newList);
+                    if (index === roamTrackIndex) {
+                        if (newList.length > 0) {
+                            handleNextTrack();
+                        } else {
+                            setIsRoamingMode(false);
+                            const player = getActivePlayer();
+                            if (player) player.pause();
+                            setAudioState(prev => ({ ...prev, isPlaying: false, fileName: '' }));
+                        }
+                    } else if (index < roamTrackIndex) {
+                        setRoamTrackIndex(prev => prev - 1);
+                    }
+                } else {
+                    const newList = [...mainPlaylist];
+                    newList.splice(index, 1);
+                    setMainPlaylist(newList);
+                    if (isExternalQueue) {
+                        window.dispatchEvent(new CustomEvent('sonicpulse-remove-queue-track', { detail: index }));
+                    }
+                    if (index === mainTrackIndex) {
+                        if (newList.length > 0) {
+                            handleNextTrack();
+                        } else {
+                            const player = getActivePlayer();
+                            if (player) player.pause();
+                            setAudioState(prev => ({ ...prev, isPlaying: false, fileName: '' }));
+                        }
+                    } else if (index < mainTrackIndex) {
+                        setMainTrackIndex(prev => prev - 1);
+                    }
+                }
+            }}
           />
         )}
       </div>

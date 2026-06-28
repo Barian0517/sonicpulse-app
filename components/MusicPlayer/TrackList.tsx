@@ -167,8 +167,7 @@ export const TrackList: React.FC<{
                         key={track.id} 
                         className={`group flex items-center gap-4 p-3 rounded-xl cursor-pointer transition-colors ${isCurrent ? 'bg-purple-500/20 text-purple-200 border border-purple-500/30' : 'hover:bg-white/5 text-gray-300'}`}
                         onClick={() => {
-                            if (onPlayNow) onPlayNow(tracks, idx);
-                            else onPlayTrack(track);
+                            onPlayTrack(track);
                         }}
                         onContextMenu={(e) => handleContextMenu(e, track)}
                     >
@@ -245,12 +244,8 @@ export const TrackList: React.FC<{
                     {!showPlaylists ? (
                         <>
                             <button className="w-full text-left px-4 py-2 hover:bg-white/10 flex items-center gap-3 transition-colors" onClick={() => {
-                                const idx = tracks.findIndex(t => t.id === menuTrackId);
-                                if (onPlayNow && idx !== -1) onPlayNow(tracks, idx);
-                                else {
-                                    const t = tracks.find(t => t.id === menuTrackId);
-                                    if (t) onPlayTrack(t);
-                                }
+                                const t = tracks.find(t => t.id === menuTrackId);
+                                if (t) onPlayTrack(t);
                                 setMenuTrackId(null);
                             }}>
                                 <Play size={16} /> {t('player.play')}

@@ -17,6 +17,7 @@
     "downloadForOffline": "下載",
     "play": "播放",
     "playNext": "下一首播放",
+    "playAll": "播放全部",
     "saveToPlaylist": "收藏到播放清單...",
     "download": "下載",
     "removeFromPlaylist": "從播放清單移除",
@@ -36,9 +37,18 @@
     "title": "設定",
     "tabs": {
       "basic": "基礎設定",
+      "preferences": "偏好設定",
       "storage": "儲存與路徑",
       "server": "伺服器與帳號",
       "jukebox": "線上點歌"
+    },
+    "preferences": {
+      "title": "偏好設定",
+      "playBehavior": "播放行為",
+      "playAllBehavior": "「播放全部」行為",
+      "playSingleBehavior": "「點擊單曲」行為",
+      "behaviorReplace": "清除序列並播放",
+      "behaviorInsert": "插入並立刻播放"
     },
     "jukebox": {
       "title": "線上點歌 (Jukebox)",

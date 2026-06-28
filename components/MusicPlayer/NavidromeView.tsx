@@ -139,14 +139,18 @@ export const NavidromeView: React.FC<{
 
     useEffect(() => {
         const handleReload = (e: any) => {
-            if (e.detail === 'navidrome') {
+            if (e.detail === 'navidrome' || !e.detail) {
                 if (activeTab !== 'explore') {
                     fetchTabContent(activeTab);
                 }
             }
         };
         window.addEventListener('sonicpulse-reload-source', handleReload);
-        return () => window.removeEventListener('sonicpulse-reload-source', handleReload);
+        window.addEventListener('sonicpulse-liked-songs-updated', handleReload);
+        return () => {
+            window.removeEventListener('sonicpulse-reload-source', handleReload);
+            window.removeEventListener('sonicpulse-liked-songs-updated', handleReload);
+        };
     }, [activeTab]);
 
     useEffect(() => {

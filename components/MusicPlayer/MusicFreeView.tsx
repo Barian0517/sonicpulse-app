@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Loader2, Music2, Plug, Play, PlayCircle, MoreHorizontal, Heart, Clock, ListMusic, Settings2, ShieldCheck, Download } from 'lucide-react';
+import { Search, Loader2, Music2, Plug, Play, PlayCircle, MoreHorizontal, Heart, Clock, ListMusic, Settings2, ShieldCheck, Download, Plus } from 'lucide-react';
 import { MusicFreeProvider } from '../../providers/MusicFreeProvider';
 import { Track } from '../../providers/MusicProvider';
 import { MusicFreePluginManager } from './MusicFreePluginManager';
@@ -9,15 +9,21 @@ export const MusicFreeView: React.FC<{
     provider: MusicFreeProvider;
     onPlayTrack: (track: Track) => void;
     onPlayNow: (tracks: Track[], startIndex?: number) => void;
+    onPlayNext?: (tracks: Track[]) => void;
+    onAddToQueue?: (tracks: Track[]) => void;
     currentTrackId?: string;
     isPlaying: boolean;
-}> = ({ provider, onPlayTrack, onPlayNow, currentTrackId, isPlaying }) => {
+}> = ({ provider, onPlayTrack, onPlayNow, onPlayNext, onAddToQueue, currentTrackId, isPlaying }) => {
     const [plugins, setPlugins] = useState<any[]>([]);
     const [selectedPluginId, setSelectedPluginId] = useState<string>('');
     const [searchQuery, setSearchQuery] = useState('');
     const [isSearching, setIsSearching] = useState(false);
     const [searchResults, setSearchResults] = useState<Track[]>([]);
     const [activeTab, setActiveTab] = useState<'search' | 'history' | 'favorites' | 'playlists' | 'plugins'>('search');
+    
+    // Menu state
+    const [menuTrackId, setMenuTrackId] = useState<string | null>(null);
+    const [menuPosition, setMenuPosition] = useState({ x: 0, y: 0 });
 
     // Favorites and History states
     const [favorites, setFavorites] = useState<Track[]>([]);
@@ -56,6 +62,13 @@ export const MusicFreeView: React.FC<{
             if (raw) setHistory(JSON.parse(raw));
         } catch (e) { }
     };
+
+    // Close menu on outside click
+    useEffect(() => {
+        const handleClickOutside = () => setMenuTrackId(null);
+        window.addEventListener('click', handleClickOutside);
+        return () => window.removeEventListener('click', handleClickOutside);
+    }, []);
 
     useEffect(() => {
         loadPlugins();
@@ -133,10 +146,10 @@ export const MusicFreeView: React.FC<{
         }
     };
 
-    const handlePlayTrack = (trackList: Track[], idx: number) => {
-        onPlayNow(trackList, idx);
+    const handlePlayTrack = (tracksToPlay: Track[], idx: number) => {
+        onPlayTrack(tracksToPlay[idx]);
         // Add to history
-        const track = trackList[idx];
+        const track = tracksToPlay[idx];
         try {
             const raw = localStorage.getItem('sonicpulse_musicfree_history') || '[]';
             const hist: Track[] = JSON.parse(raw);
@@ -174,6 +187,14 @@ export const MusicFreeView: React.FC<{
 
         return (
             <div className="flex flex-col gap-2 pb-32">
+                <div className="flex items-center gap-2 mb-2">
+                    <button className="flex items-center gap-2 px-4 py-2 bg-white text-black font-bold rounded-full hover:scale-105 active:scale-95 transition-all" onClick={() => {
+                        if (onPlayNow && tracks.length > 0) onPlayNow(tracks, 0);
+                        else if (tracks.length > 0) onPlayTrack(tracks[0]);
+                    }}>
+                        <Play size={16} fill="currentColor" /> {t('player.playAll') || '播放全部'}
+                    </button>
+                </div>
                 {tracks.map((track, idx) => (
                     <div
                         key={track.id + idx}
@@ -213,7 +234,15 @@ export const MusicFreeView: React.FC<{
                             <button onClick={(e) => handleToggleStar(e, track)} className={`hover:scale-110 transition-transform ${((window as any).__sonicpulse_liked_ids || []).includes(track.id) ? 'text-red-500' : 'text-gray-600 hover:text-white'}`} title={((window as any).__sonicpulse_liked_ids || []).includes(track.id) ? t('player.cancelLike') : t('player.addLike')}>
                                 <Heart size={20} className={((window as any).__sonicpulse_liked_ids || []).includes(track.id) ? 'fill-red-500' : ''} />
                             </button>
-                            <button className="text-gray-400 hover:text-white p-2 rounded-full hover:bg-white/10 transition-colors">
+                            <button 
+                                className="text-gray-400 hover:text-white p-2 rounded-full hover:bg-white/10 transition-colors"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    const rect = e.currentTarget.getBoundingClientRect();
+                                    setMenuPosition({ x: rect.left, y: rect.bottom });
+                                    setMenuTrackId(track.id);
+                                }}
+                            >
                                 <MoreHorizontal size={20} />
                             </button>
                         </div>
@@ -408,6 +437,35 @@ export const MusicFreeView: React.FC<{
                     </div>
                 )}
             </div>
+            {/* Track Menu */}
+            {menuTrackId && (
+                <div 
+                    className="fixed z-50 bg-[#151520] border border-white/10 rounded-xl shadow-2xl py-2 min-w-[180px] backdrop-blur-xl text-sm"
+                    style={{ left: Math.max(10, menuPosition.x - 220), top: Math.min(menuPosition.y, window.innerHeight - 300) }}
+                    onClick={e => e.stopPropagation()}
+                >
+                    <button className="w-full text-left px-4 py-2 hover:bg-white/10 flex items-center gap-3 transition-colors" onClick={() => {
+                        const allTracks = activeTab === 'search' ? searchResults : activeTab === 'history' ? history : activeTab === 'favorites' ? favorites : [];
+                        const t = allTracks.find(tr => tr.id === menuTrackId);
+                        if (t && onPlayNext) {
+                            onPlayNext([t]);
+                        }
+                        setMenuTrackId(null);
+                    }}>
+                        <Play size={16} className="rotate-90" /> {t('player.playNext') || '下一首播放'}
+                    </button>
+                    <button className="w-full text-left px-4 py-2 hover:bg-white/10 flex items-center gap-3 transition-colors" onClick={() => {
+                        const allTracks = activeTab === 'search' ? searchResults : activeTab === 'history' ? history : activeTab === 'favorites' ? favorites : [];
+                        const t = allTracks.find(tr => tr.id === menuTrackId);
+                        if (t && onAddToQueue) {
+                            onAddToQueue([t]);
+                        }
+                        setMenuTrackId(null);
+                    }}>
+                        <Plus size={16} /> {t('player.addToQueue') || '加入序列'}
+                    </button>
+                </div>
+            )}
         </div>
     );
 };

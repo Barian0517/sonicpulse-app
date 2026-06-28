@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Settings, Music2, Disc, PlaySquare, Search, Library, FolderOpen, Play, Pause, SkipBack, SkipForward, Server, ChevronLeft, Heart, RefreshCw, Plug } from 'lucide-react';
+import { Settings, Settings2, Music2, Disc, PlaySquare, Search, Library, FolderOpen, Play, Pause, SkipBack, SkipForward, Server, ChevronLeft, Heart, RefreshCw, Plug } from 'lucide-react';
 import { open } from '@tauri-apps/plugin-dialog';
 import { convertFileSrc } from '@tauri-apps/api/core';
 import { LocalProvider } from '../../providers/LocalProvider';
@@ -37,7 +37,11 @@ export const MusicPlayerLayout: React.FC<{
     const [isSearching, setIsSearching] = useState(false);
     
     // Settings Tab State
-    const [activeSettingsTab, setActiveSettingsTab] = useState<'basic' | 'storage' | 'server' | 'jukebox'>('basic');
+    const [activeSettingsTab, setActiveSettingsTab] = useState<'basic' | 'storage' | 'server' | 'jukebox' | 'preferences'>('basic');
+    
+    // Preferences State
+    const [playAllBehavior, setPlayAllBehavior] = useState<'replace' | 'insert'>(localStorage.getItem('sonicpulse_play_all_behavior') as 'replace' | 'insert' || 'insert');
+    const [playSingleBehavior, setPlaySingleBehavior] = useState<'replace' | 'insert'>(localStorage.getItem('sonicpulse_play_single_behavior') as 'replace' | 'insert' || 'insert');
     
     // Timeline Seek State
     const [localSeek, setLocalSeek] = useState<number | null>(null);
@@ -89,6 +93,31 @@ export const MusicPlayerLayout: React.FC<{
     const [isHoveringTimeline, setIsHoveringTimeline] = useState(false);
     const [isCurrentTrackLiked, setIsCurrentTrackLiked] = useState(false);
 
+    // Initialize global liked IDs for Netease and MusicFree
+    useEffect(() => {
+        const initLikedIds = async () => {
+            try {
+                const ids = new Set<string>((window as any).__sonicpulse_liked_ids || []);
+                // Fetch Netease favorites if logged in
+                if (localStorage.getItem('netease_cookie')) {
+                    const n = await neteaseProvider.getStarred();
+                    n.tracks.forEach((t: Track) => ids.add(t.id));
+                }
+                // Fetch MusicFree favorites
+                const m = await musicFreeProvider.getStarred();
+                m.tracks.forEach((t: Track) => ids.add(t.id));
+
+                (window as any).__sonicpulse_liked_ids = Array.from(ids);
+                window.dispatchEvent(new CustomEvent('sonicpulse-liked-songs-updated'));
+            } catch (e) {
+                console.error("Failed to init liked ids", e);
+            }
+        };
+        if (!(window as any).__sonicpulse_liked_ids) {
+            initLikedIds();
+        }
+    }, [neteaseProvider, musicFreeProvider]);
+
     useEffect(() => {
         const checkLikedStatus = () => {
             if (!currentTrack) {
@@ -138,7 +167,8 @@ export const MusicPlayerLayout: React.FC<{
                 const provider = currentTrack.source === 'local' ? localProvider : naviProvider;
                 await provider.star(currentTrack.id, 'track', !currentStatus);
                 setCurrentTrack(prev => prev ? { ...prev, isStarred: !currentStatus } : prev);
-                // Also update in queue if necessary, but this is fine for now
+                window.dispatchEvent(new CustomEvent('sonicpulse-toast', { detail: !currentStatus ? "已加入紅心歌曲" : "已取消紅心" }));
+                window.dispatchEvent(new CustomEvent('sonicpulse-liked-songs-updated'));
             }
         } catch (e) {
             console.error(e);
@@ -379,7 +409,13 @@ export const MusicPlayerLayout: React.FC<{
     };
 
     const playNow = (tracksToPlay: Track[], startIndex: number = 0) => {
-        playInsertNextAndPlay(tracksToPlay, startIndex);
+        if (playAllBehavior === 'replace') {
+            setQueue(tracksToPlay);
+            setQueueIndex(startIndex);
+            playTrackUrl(tracksToPlay[startIndex]);
+        } else {
+            playInsertNextAndPlay(tracksToPlay, startIndex);
+        }
     };
 
     const playNext = (tracksToInsert: Track[]) => {
@@ -557,17 +593,57 @@ export const MusicPlayerLayout: React.FC<{
         window.addEventListener('sonicpulse-play-next', onExtPlayNext);
         window.addEventListener('sonicpulse-play-prev', onExtPlayPrev);
         window.addEventListener('sonicpulse-play-index', onExtPlayIndex);
+
+        const onClearQueue = () => {
+            setQueue([]);
+            setQueueIndex(-1);
+            setCurrentTrack(null);
+        };
+
+        const onRemoveQueueTrack = (e: any) => {
+            const index = e.detail;
+            if (index !== undefined && index >= 0 && index < queue.length) {
+                setQueue(prev => {
+                    const newList = [...prev];
+                    newList.splice(index, 1);
+                    return newList;
+                });
+                if (index === queueIndex) {
+                    // It will automatically trigger a play next if we don't do anything?
+                    // Actually, App.tsx handles the playback state already. We just need to update our queue state.
+                    // But if queue length is now 0...
+                    if (queue.length - 1 === 0) {
+                        setQueueIndex(-1);
+                        setCurrentTrack(null);
+                    }
+                } else if (index < queueIndex) {
+                    setQueueIndex(prev => prev - 1);
+                }
+            }
+        };
+
+        window.addEventListener('sonicpulse-clear-queue', onClearQueue);
+        window.addEventListener('sonicpulse-remove-queue-track', onRemoveQueueTrack);
+
         return () => {
             window.removeEventListener('sonicpulse-track-ended', onTrackEnded);
             window.removeEventListener('sonicpulse-play-next', onExtPlayNext);
             window.removeEventListener('sonicpulse-play-prev', onExtPlayPrev);
             window.removeEventListener('sonicpulse-play-index', onExtPlayIndex);
+            window.removeEventListener('sonicpulse-clear-queue', onClearQueue);
+            window.removeEventListener('sonicpulse-remove-queue-track', onRemoveQueueTrack);
         };
     }, [queue, queueIndex]);
 
-    // Keep playTrack for backward compatibility with old views, mapping it to playNow
+    // Keep playTrack for backward compatibility with old views, mapping it to playInsertNextAndPlay
     const playTrack = async (track: Track) => {
-        playNow([track], 0);
+        if (playSingleBehavior === 'replace') {
+            setQueue([track]);
+            setQueueIndex(0);
+            playTrackUrl(track);
+        } else {
+            playInsertNextAndPlay([track], 0);
+        }
     };
 
     const togglePlay = () => {
@@ -781,6 +857,8 @@ export const MusicPlayerLayout: React.FC<{
                                 provider={musicFreeProvider} 
                                 onPlayTrack={playTrack}
                                 onPlayNow={playNow}
+                                onPlayNext={playNext}
+                                onAddToQueue={addToQueue}
                                 currentTrackId={currentTrack?.id} 
                                 isPlaying={isPlaying} 
                             />
@@ -798,6 +876,12 @@ export const MusicPlayerLayout: React.FC<{
                                         className={`flex items-center gap-3 px-4 py-3 rounded-xl font-bold text-sm transition-all ${activeSettingsTab === 'basic' ? 'bg-purple-600/20 text-purple-400 border border-purple-500/30 shadow-[0_0_15px_rgba(168,85,247,0.1)]' : 'text-gray-400 hover:text-white hover:bg-white/5 border border-transparent'}`}
                                     >
                                         🌐 {t('settings.tabs.basic')}
+                                    </button>
+                                    <button 
+                                        onClick={() => setActiveSettingsTab('preferences')}
+                                        className={`flex items-center gap-3 px-4 py-3 rounded-xl font-bold text-sm transition-all ${activeSettingsTab === 'preferences' ? 'bg-yellow-600/20 text-yellow-400 border border-yellow-500/30 shadow-[0_0_15px_rgba(234,179,8,0.1)]' : 'text-gray-400 hover:text-white hover:bg-white/5 border border-transparent'}`}
+                                    >
+                                        <Settings2 size={18} /> {t('settings.tabs.preferences') || '偏好設定'}
                                     </button>
                                     <button 
                                         onClick={() => setActiveSettingsTab('storage')}
@@ -838,6 +922,57 @@ export const MusicPlayerLayout: React.FC<{
                                                     <option value="ja" className="bg-[#151520] text-white">日本語</option>
                                                     <option value="en" className="bg-[#151520] text-white">English</option>
                                                 </select>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {activeSettingsTab === 'preferences' && (
+                                        <div className="max-w-2xl animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-6">
+                                            {/* Preferences Settings */}
+                                            <div className="bg-white/5 p-6 rounded-2xl border border-white/5 shadow-inner">
+                                                <h3 className="text-lg font-bold mb-6 flex items-center gap-2"><Settings2 size={20} className="text-yellow-400" /> {t('settings.preferences.playBehavior') || '播放行為'}</h3>
+                                                
+                                                <div className="space-y-6">
+                                                    <div>
+                                                        <label className="block text-sm font-medium text-gray-300 mb-2">{t('settings.preferences.playAllBehavior') || '「播放全部」行為'}</label>
+                                                        <div className="flex gap-4">
+                                                            <label className="flex items-center gap-2 cursor-pointer bg-[#151520] px-4 py-3 rounded-xl border border-white/10 flex-1 hover:border-yellow-500/50 transition-colors">
+                                                                <input type="radio" name="playAll" value="replace" checked={playAllBehavior === 'replace'} onChange={() => {
+                                                                    setPlayAllBehavior('replace');
+                                                                    localStorage.setItem('sonicpulse_play_all_behavior', 'replace');
+                                                                }} className="text-yellow-500 focus:ring-yellow-500" />
+                                                                <span className="text-sm">{t('settings.preferences.behaviorReplace') || '清除序列並播放'}</span>
+                                                            </label>
+                                                            <label className="flex items-center gap-2 cursor-pointer bg-[#151520] px-4 py-3 rounded-xl border border-white/10 flex-1 hover:border-yellow-500/50 transition-colors">
+                                                                <input type="radio" name="playAll" value="insert" checked={playAllBehavior === 'insert'} onChange={() => {
+                                                                    setPlayAllBehavior('insert');
+                                                                    localStorage.setItem('sonicpulse_play_all_behavior', 'insert');
+                                                                }} className="text-yellow-500 focus:ring-yellow-500" />
+                                                                <span className="text-sm">{t('settings.preferences.behaviorInsert') || '插入並立刻播放'}</span>
+                                                            </label>
+                                                        </div>
+                                                    </div>
+
+                                                    <div>
+                                                        <label className="block text-sm font-medium text-gray-300 mb-2">{t('settings.preferences.playSingleBehavior') || '「點擊單曲」行為'}</label>
+                                                        <div className="flex gap-4">
+                                                            <label className="flex items-center gap-2 cursor-pointer bg-[#151520] px-4 py-3 rounded-xl border border-white/10 flex-1 hover:border-yellow-500/50 transition-colors">
+                                                                <input type="radio" name="playSingle" value="replace" checked={playSingleBehavior === 'replace'} onChange={() => {
+                                                                    setPlaySingleBehavior('replace');
+                                                                    localStorage.setItem('sonicpulse_play_single_behavior', 'replace');
+                                                                }} className="text-yellow-500 focus:ring-yellow-500" />
+                                                                <span className="text-sm">{t('settings.preferences.behaviorReplace') || '清除序列並播放'}</span>
+                                                            </label>
+                                                            <label className="flex items-center gap-2 cursor-pointer bg-[#151520] px-4 py-3 rounded-xl border border-white/10 flex-1 hover:border-yellow-500/50 transition-colors">
+                                                                <input type="radio" name="playSingle" value="insert" checked={playSingleBehavior === 'insert'} onChange={() => {
+                                                                    setPlaySingleBehavior('insert');
+                                                                    localStorage.setItem('sonicpulse_play_single_behavior', 'insert');
+                                                                }} className="text-yellow-500 focus:ring-yellow-500" />
+                                                                <span className="text-sm">{t('settings.preferences.behaviorInsert') || '插入並立刻播放'}</span>
+                                                            </label>
+                                                        </div>
+                                                    </div>
+                                                </div>
                                             </div>
                                         </div>
                                     )}
