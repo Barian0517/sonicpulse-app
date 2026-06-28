@@ -334,6 +334,7 @@ app.post('/plugin/call', async (req, res) => {
 let jukeboxServer = null;
 let jukeboxIo = null;
 let hostSocket = null;
+let lastHostState = null;
 
 // Serve the Jukebox frontend files
 app.use('/jukebox', express.static(path.join(__dirname, 'dist-jukebox')));
@@ -372,6 +373,10 @@ app.post('/jukebox/configure', (req, res) => {
         jukeboxIo.on('connection', (socket) => {
             console.log('Jukebox client connected:', socket.id);
             
+            if (lastHostState && socket !== hostSocket) {
+                socket.emit('state_update', lastHostState);
+            }
+
             socket.on('register_host', () => {
                 console.log('Host registered:', socket.id);
                 hostSocket = socket;
@@ -390,11 +395,16 @@ app.post('/jukebox/configure', (req, res) => {
                 }
             });
 
+            // Route search results from host to web clients
+            socket.on('host_search_results', (data) => {
+                socket.broadcast.emit('host_search_results', data);
+            });
+
             // Route state from host to all web clients
             socket.on('host_state_update', (state) => {
-                if (socket === hostSocket) {
-                    socket.broadcast.emit('state_update', state);
-                }
+                hostSocket = socket; // Auto-register as host if sending state
+                lastHostState = state;
+                socket.broadcast.emit('state_update', state);
             });
         });
 

@@ -481,13 +481,45 @@ export const MusicPlayerLayout: React.FC<{
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [queue, queueIndex]);
 
+    const jukeboxStateRef = useRef({
+        neteaseProvider,
+        naviProvider,
+        musicFreeProvider,
+        addToQueue,
+        playNext,
+        onTogglePlay,
+        onSeek,
+        handlePrev,
+        handleNext,
+        jukeboxSources,
+        jukeboxAllowPlayNext,
+        jukeboxAllowControl
+    });
+
+    useEffect(() => {
+        jukeboxStateRef.current = {
+            neteaseProvider,
+            naviProvider,
+            musicFreeProvider,
+            addToQueue,
+            playNext,
+            onTogglePlay,
+            onSeek,
+            handlePrev,
+            handleNext,
+            jukeboxSources,
+            jukeboxAllowPlayNext,
+            jukeboxAllowControl
+        };
+    });
+
     // --- Jukebox Host Logic ---
     useEffect(() => {
         if (!jukeboxEnabled) {
-            if (jukeboxSocket) {
-                jukeboxSocket.disconnect();
-                setJukeboxSocket(null);
-            }
+            setJukeboxSocket(prev => {
+                if (prev) prev.disconnect();
+                return null;
+            });
             // Ask plugin server to stop Jukebox
             fetch('http://127.0.0.1:30001/jukebox/configure', {
                 method: 'POST',
@@ -517,21 +549,24 @@ export const MusicPlayerLayout: React.FC<{
                     socket.emit('register_host');
                 });
 
+                let currentSocket = socket;
+
                 socket.on('client_command', async (cmd: any) => {
+                    const s = jukeboxStateRef.current;
                     console.log('Jukebox Command:', cmd);
                     if (cmd.type === 'search') {
                         let results: Track[] = [];
                         try {
-                            if (cmd.source === 'netease' && jukeboxSources.includes('netease')) {
-                                results = (await neteaseProvider.search(cmd.query)).tracks;
-                            } else if (cmd.source === 'navidrome' && jukeboxSources.includes('navidrome')) {
-                                results = (await naviProvider.search(cmd.query)).tracks;
-                            } else if (cmd.source === 'musicfree' && jukeboxSources.includes('musicfree')) {
+                            if (cmd.source === 'netease' && s.jukeboxSources.includes('netease')) {
+                                results = (await s.neteaseProvider.search(cmd.query)).tracks;
+                            } else if (cmd.source === 'navidrome' && s.jukeboxSources.includes('navidrome')) {
+                                results = (await s.naviProvider.search(cmd.query)).tracks;
+                            } else if (cmd.source === 'musicfree' && s.jukeboxSources.includes('musicfree')) {
                                 try {
                                     const disabledPlugins = JSON.parse(localStorage.getItem('sonicpulse_disabled_plugins') || '[]');
-                                    const allPlugins = await musicFreeProvider.getPlugins();
+                                    const allPlugins = await s.musicFreeProvider.getPlugins();
                                     const enabledPluginIds = allPlugins.filter((p: any) => !disabledPlugins.includes(p.id)).map((p: any) => p.id);
-                                    results = (await musicFreeProvider.searchAll(cmd.query, enabledPluginIds)).tracks;
+                                    results = (await s.musicFreeProvider.searchAll(cmd.query, enabledPluginIds)).tracks;
                                 } catch (e) {
                                     console.error('MusicFree Jukebox search error:', e);
                                     results = [];
@@ -540,25 +575,28 @@ export const MusicPlayerLayout: React.FC<{
                         } catch (e) {
                             console.error('Jukebox search error:', e);
                         }
-                        socket.emit('host_search_results', { reqId: cmd.reqId, results });
+                        currentSocket.emit('host_search_results', { reqId: cmd.reqId, results });
                     } else if (cmd.type === 'add_to_queue') {
-                        addToQueue([cmd.track]);
-                    } else if (cmd.type === 'play_next' && jukeboxAllowPlayNext) {
-                        playNext([cmd.track]);
-                    } else if (jukeboxAllowControl) {
-                        if (cmd.type === 'toggle_play') onTogglePlay();
-                        else if (cmd.type === 'seek') onSeek(cmd.time);
-                        else if (cmd.type === 'prev') handlePrev();
-                        else if (cmd.type === 'next') handleNext();
+                        s.addToQueue([cmd.track]);
+                    } else if (cmd.type === 'play_next' && s.jukeboxAllowPlayNext) {
+                        s.playNext([cmd.track]);
+                    } else if (s.jukeboxAllowControl) {
+                        if (cmd.type === 'toggle_play') s.onTogglePlay();
+                        else if (cmd.type === 'seek') s.onSeek(cmd.time);
+                        else if (cmd.type === 'prev') s.handlePrev();
+                        else if (cmd.type === 'next') s.handleNext();
                     }
                 });
             }
         }).catch(console.error);
 
         return () => {
-            if (jukeboxSocket) jukeboxSocket.disconnect();
+            setJukeboxSocket(prev => {
+                if (prev) prev.disconnect();
+                return null;
+            });
         };
-    }, [jukeboxEnabled, jukeboxPort, jukeboxAllowPlayNext, jukeboxAllowControl, jukeboxSources]);
+    }, [jukeboxEnabled, jukeboxPort]);
 
     // Send state updates to Jukebox
     useEffect(() => {
