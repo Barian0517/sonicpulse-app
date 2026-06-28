@@ -663,6 +663,7 @@ export const MusicPlayerLayout: React.FC<{
                         } catch (e) {}
 
                         currentSocket.emit('personal_data', {
+                            neteaseUrl: localStorage.getItem('netease_server_url'),
                             neteaseCookie: localStorage.getItem('netease_cookie'),
                             neteaseUid: localStorage.getItem('netease_uid'),
                             navidromeUrl: naviUrl,

@@ -52,10 +52,47 @@ export const JukeboxApp: React.FC = () => {
     const [naviProvider, setNaviProvider] = useState<NavidromeProvider | null>(null);
     const [musicFreeProvider, setMusicFreeProvider] = useState<MusicFreeProvider | null>(null);
 
+    const hasFetchedPersonalDataRef = useRef(false);
+
     useEffect(() => {
         const wsPort = localStorage.getItem('jukebox_ws_port');
         const wsUrl = wsPort ? `http://${window.location.hostname}:${wsPort}` : undefined;
         
+        // Proxy for CORS and Firewall issues on Jukebox Web
+        const originalFetch = window.fetch;
+        window.fetch = async (input, init) => {
+            const url = typeof input === 'string' ? input : (input instanceof Request ? input.url : input.toString());
+            
+            const isProxyNeeded = url.includes(':30000') || url.includes(':30001') || url.includes('/rest/') || url.includes('navidrome');
+            
+            if (isProxyNeeded && wsPort) {
+                const proxyUrl = `http://${window.location.hostname}:${wsPort}/api/proxy`;
+                if (!init || init.method === 'GET' || !init.method) {
+                    return originalFetch(`${proxyUrl}?url=${encodeURIComponent(url)}`, init);
+                } else {
+                    const response = await originalFetch(proxyUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            url,
+                            method: init.method,
+                            headers: init.headers || {},
+                            body: init.body
+                        })
+                    });
+                    
+                    if (response.ok) {
+                        const buffer = await response.arrayBuffer();
+                        return new Response(buffer, {
+                            status: response.status,
+                            headers: new Headers({ 'Content-Type': 'application/json' }) // Fallback, real headers not preserved natively but usually fine
+                        });
+                    }
+                }
+            }
+            return originalFetch(input, init);
+        };
+
         const newSocket = io(wsUrl);
         setSocket(newSocket);
 
@@ -70,9 +107,12 @@ export const JukeboxApp: React.FC = () => {
 
         newSocket.on('state_update', (state) => {
             setHostState(prev => ({...prev, ...state}));
-            if (state.permissions?.personalMode && !hostState.permissions?.personalMode) {
+            if (state.permissions?.personalMode && !hasFetchedPersonalDataRef.current) {
                 // Personal mode turned on! Fetch data
+                hasFetchedPersonalDataRef.current = true;
                 newSocket.emit('client_command', { type: 'get_personal_data' });
+            } else if (!state.permissions?.personalMode) {
+                hasFetchedPersonalDataRef.current = false;
             }
         });
 
@@ -81,8 +121,13 @@ export const JukeboxApp: React.FC = () => {
             
             // Init Providers
             const np = new NeteaseProvider();
-            // In browser, NeteaseProvider uses window.location.hostname automatically due to adaptive fetch
-            if (data.neteaseCookie) localStorage.setItem('netease_cookie', data.neteaseCookie);
+            if (data.neteaseUrl) {
+                np.setServerUrl(data.neteaseUrl.replace('localhost', window.location.hostname).replace('127.0.0.1', window.location.hostname));
+            }
+            if (data.neteaseCookie) {
+                localStorage.setItem('netease_cookie', data.neteaseCookie);
+                np.setCookie(data.neteaseCookie);
+            }
             if (data.neteaseUid) localStorage.setItem('netease_uid', data.neteaseUid);
             setNeteaseProvider(np);
 
@@ -104,6 +149,7 @@ export const JukeboxApp: React.FC = () => {
         });
 
         return () => {
+            window.fetch = originalFetch;
             newSocket.disconnect();
         };
     }, []);
@@ -197,7 +243,7 @@ export const JukeboxApp: React.FC = () => {
                     onAddToQueue={(tracks) => socket?.emit('client_command', { type: 'insert_last', track: tracks[0] })}
                     currentTrackId={hostState.currentTrack?.id}
                     isPlaying={hostState.isPlaying}
-                    isJukebox={true}
+                    
                 />
             );
         } else if (activeSource === 'navidrome' && naviProvider) {
@@ -222,7 +268,7 @@ export const JukeboxApp: React.FC = () => {
                     onAddToQueue={(tracks) => socket?.emit('client_command', { type: 'insert_last', track: tracks[0] })}
                     currentTrackId={hostState.currentTrack?.id}
                     isPlaying={hostState.isPlaying}
-                    isJukebox={true}
+                    
                 />
             );
         }

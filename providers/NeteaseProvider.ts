@@ -7,12 +7,16 @@ export class NeteaseProvider implements MusicProvider {
 
     constructor() {
         let savedUrl = localStorage.getItem('netease_server_url');
-        if (!savedUrl || savedUrl.includes('vercel.app')) {
-            savedUrl = 'http://127.0.0.1:30000';
+        
+        // Force correction if running on external network but URL is local
+        const isExternalClient = window.location.hostname !== 'tauri.localhost' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
+        if (!savedUrl || savedUrl.includes('vercel.app') || (isExternalClient && (savedUrl.includes('127.0.0.1') || savedUrl.includes('localhost')))) {
+            savedUrl = `http://${window.location.hostname === 'tauri.localhost' || window.location.hostname === 'localhost' ? '127.0.0.1' : window.location.hostname}:30000`;
             localStorage.setItem('netease_server_url', savedUrl);
         }
         this.serverUrl = savedUrl;
         this.cookie = localStorage.getItem('netease_cookie') || '';
+
         
         // Ensure trailing slash is removed
         if (this.serverUrl.endsWith('/')) {
@@ -22,6 +26,13 @@ export class NeteaseProvider implements MusicProvider {
 
     setCookie(cookie: string) {
         this.cookie = cookie;
+    }
+
+    setServerUrl(url: string) {
+        this.serverUrl = url;
+        if (this.serverUrl.endsWith('/')) {
+            this.serverUrl = this.serverUrl.slice(0, -1);
+        }
     }
 
     private async request(endpoint: string, params: Record<string, any> = {}) {

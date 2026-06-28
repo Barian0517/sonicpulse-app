@@ -349,6 +349,51 @@ app.post('/jukebox/configure', (req, res) => {
         const jukeboxApp = express();
         jukeboxApp.use(cors());
         
+        jukeboxApp.use(express.json({ limit: '10mb' }));
+
+        jukeboxApp.post('/api/proxy', async (req, res) => {
+            const { url, method, headers, body } = req.body;
+            try {
+                const response = await axios({
+                    url,
+                    method: method || 'GET',
+                    headers: headers || {},
+                    data: body,
+                    responseType: 'arraybuffer',
+                    validateStatus: () => true
+                });
+                for (const [key, value] of Object.entries(response.headers)) {
+                    if (key.toLowerCase() !== 'transfer-encoding') {
+                        try { res.setHeader(key, value); } catch(e) {}
+                    }
+                }
+                res.status(response.status).send(response.data);
+            } catch (e) {
+                console.error("Proxy error:", e.message);
+                res.status(500).json({ error: e.message });
+            }
+        });
+
+        jukeboxApp.get('/api/proxy', async (req, res) => {
+            const targetUrl = req.query.url;
+            try {
+                const response = await axios({
+                    url: targetUrl,
+                    method: 'GET',
+                    responseType: 'stream',
+                    validateStatus: () => true
+                });
+                for (const [key, value] of Object.entries(response.headers)) {
+                    if (key.toLowerCase() !== 'transfer-encoding') {
+                        try { res.setHeader(key, value); } catch(e) {}
+                    }
+                }
+                response.data.pipe(res);
+            } catch (e) {
+                res.status(500).end();
+            }
+        });
+
         const distPath = path.join(__dirname, 'dist');
         jukeboxApp.use(express.static(distPath));
         
