@@ -1,62 +1,59 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
-import { Search, Music2, Play, Pause, SkipBack, SkipForward, Disc, Server, Plug, Settings, Library, Heart, Compass, ListVideo, Trash2, X } from 'lucide-react';
+import { Compass, Mic2, Disc3, ListMusic, Heart, DownloadCloud, Play, Pause, Search, Star, Download, PlayCircle, Loader2, MoreHorizontal, X, SkipBack, SkipForward, Settings, Trash2, Library, Music2, ListVideo } from 'lucide-react';
 import { Track } from '../../providers/MusicProvider';
+import { NeteaseProvider } from '../../providers/NeteaseProvider';
+import { NavidromeProvider } from '../../providers/NavidromeProvider';
+import { MusicFreeProvider } from '../../providers/MusicFreeProvider';
+
+import { NeteaseView } from '../../components/MusicPlayer/NeteaseView';
+import { NavidromeView } from '../../components/MusicPlayer/NavidromeView';
+import { MusicFreeView } from '../../components/MusicPlayer/MusicFreeView';
+
+const formatTime = (timeInSeconds: number) => {
+    if (isNaN(timeInSeconds)) return "0:00";
+    const minutes = Math.floor(timeInSeconds / 60);
+    const seconds = Math.floor(timeInSeconds % 60);
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+};
 
 export const JukeboxApp: React.FC = () => {
     const [socket, setSocket] = useState<Socket | null>(null);
     const [connected, setConnected] = useState(false);
     
-    // Host State
-    const [hostState, setHostState] = useState<{
-        isPlaying: boolean;
-        progress: number;
-        duration: number;
-        currentTrack: Track | null;
-        queue: Track[];
-        queueIndex: number;
-        permissions: {
-            allowPlayNext: boolean;
-            allowControl: boolean;
-            allowCutSong: boolean;
-            allowModifyQueue: boolean;
-            personalMode: boolean;
-            allowedSources: string[];
-        }
-    }>({
+    const [hostState, setHostState] = useState<any>({
         isPlaying: false,
         progress: 0,
         duration: 0,
         currentTrack: null,
         queue: [],
         queueIndex: -1,
-        permissions: { 
-            allowPlayNext: true, allowControl: true, allowCutSong: true, allowModifyQueue: true, personalMode: true, 
-            allowedSources: ['netease', 'navidrome', 'musicfree'] 
-        }
+        permissions: {
+            allowPlayNext: true,
+            allowControl: true,
+            allowCutSong: true,
+            allowModifyQueue: true,
+            personalMode: false,
+            allowedSources: []
+        },
+        personalData: {}
     });
 
-    const [activeSource, setActiveSource] = useState<string>('netease');
-    const [searchQuery, setSearchQuery] = useState('');
-    const [isSearching, setIsSearching] = useState(false);
-    const [searchResults, setSearchResults] = useState<Track[]>([]);
-    
-    // Play behaviors
-    const [playSingleBehavior, setPlaySingleBehavior] = useState<'insert_next' | 'insert_last' | 'play_track'>(
-        localStorage.getItem('jukebox_play_single') as any || 'insert_next'
-    );
-    const [playAllBehavior, setPlayAllBehavior] = useState<'insert_next' | 'insert_last' | 'play_track'>(
-        localStorage.getItem('jukebox_play_all') as any || 'insert_last'
-    );
-
-    // Queue Panel
+    const [activeSource, setActiveSource] = useState<string>('');
     const [isQueueOpen, setIsQueueOpen] = useState(false);
+    const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [searchResults, setSearchResults] = useState<Track[]>([]);
+    const [isSearching, setIsSearching] = useState(false);
+    const searchCallbacks = useRef<Record<string, (results: Track[]) => void>>({});
 
-    const searchCallbacks = useRef<{ [key: string]: (results: Track[]) => void }>({});
+    // Providers
+    const [neteaseProvider, setNeteaseProvider] = useState<NeteaseProvider | null>(null);
+    const [naviProvider, setNaviProvider] = useState<NavidromeProvider | null>(null);
+    const [musicFreeProvider, setMusicFreeProvider] = useState<MusicFreeProvider | null>(null);
 
     useEffect(() => {
-        const params = new URLSearchParams(window.location.search);
-        const wsPort = params.get('wsPort');
+        const wsPort = localStorage.getItem('jukebox_ws_port');
         const wsUrl = wsPort ? `http://${window.location.hostname}:${wsPort}` : undefined;
         
         const newSocket = io(wsUrl);
@@ -64,6 +61,7 @@ export const JukeboxApp: React.FC = () => {
 
         newSocket.on('connect', () => {
             setConnected(true);
+            newSocket.emit('client_command', { type: 'get_personal_data' });
         });
 
         newSocket.on('disconnect', () => {
@@ -72,6 +70,30 @@ export const JukeboxApp: React.FC = () => {
 
         newSocket.on('state_update', (state) => {
             setHostState(prev => ({...prev, ...state}));
+            if (state.permissions?.personalMode && !hostState.permissions?.personalMode) {
+                // Personal mode turned on! Fetch data
+                newSocket.emit('client_command', { type: 'get_personal_data' });
+            }
+        });
+
+        newSocket.on('personal_data', (data) => {
+            setHostState(prev => ({...prev, personalData: data}));
+            
+            // Init Providers
+            const np = new NeteaseProvider();
+            // In browser, NeteaseProvider uses window.location.hostname automatically due to adaptive fetch
+            if (data.neteaseCookie) localStorage.setItem('netease_cookie', data.neteaseCookie);
+            if (data.neteaseUid) localStorage.setItem('netease_uid', data.neteaseUid);
+            setNeteaseProvider(np);
+
+            const nv = new NavidromeProvider();
+            if (data.navidromeUrl) {
+                nv.init(data.navidromeUrl.replace('localhost', window.location.hostname).replace('127.0.0.1', window.location.hostname), data.navidromeUser || '', data.navidromePass || '');
+                setNaviProvider(nv);
+            }
+
+            const mf = new MusicFreeProvider();
+            setMusicFreeProvider(mf);
         });
 
         newSocket.on('host_search_results', (data: { reqId: string, results: Track[] }) => {
@@ -99,40 +121,31 @@ export const JukeboxApp: React.FC = () => {
         setIsSearching(true);
         const reqId = Date.now().toString();
         
-        searchCallbacks.current[reqId] = (results) => {
-            setSearchResults(results);
-            setIsSearching(false);
-        };
+        const promise = new Promise<Track[]>((resolve) => {
+            searchCallbacks.current[reqId] = resolve;
+        });
 
         socket.emit('client_command', {
             type: 'search',
-            reqId,
             source: activeSource,
-            query: searchQuery
+            query: searchQuery,
+            reqId
         });
+
+        promise.then(results => {
+            setSearchResults(results);
+            setIsSearching(false);
+        }).catch(() => setIsSearching(false));
     };
 
-    const handleTrackAction = (track: Track, type: 'single' | 'all') => {
+    const handlePlayTrack = (track: Track) => {
         if (!socket) return;
-        const behavior = type === 'single' ? playSingleBehavior : playAllBehavior;
-        
-        if (behavior === 'play_track' && hostState.permissions.allowCutSong) {
-            socket.emit('client_command', { type: 'play_track', track });
-        } else if (behavior === 'insert_next' && hostState.permissions.allowPlayNext) {
-            socket.emit('client_command', { type: 'insert_next', track });
-        } else if (behavior === 'insert_last' && hostState.permissions.allowPlayNext) {
-            socket.emit('client_command', { type: 'insert_last', track });
-        }
+        socket.emit('client_command', { type: 'host_play_track', track });
     };
 
-    const handlePlayAll = () => {
-        if (!socket || searchResults.length === 0) return;
-        // Simple implementation: insert the first track with chosen behavior, and the rest as insert_last?
-        // Actually, playAll behavior usually means taking the whole list. We can just send them one by one.
-        searchResults.forEach((track, i) => {
-            if (i === 0) handleTrackAction(track, 'all');
-            else if (hostState.permissions.allowPlayNext) socket.emit('client_command', { type: 'insert_last', track });
-        });
+    const handlePlayAll = (tracks: Track[]) => {
+        if (!socket || tracks.length === 0) return;
+        socket.emit('client_command', { type: 'host_play_now', tracks });
     };
 
     const handleControl = (type: string, data?: any) => {
@@ -140,165 +153,225 @@ export const JukeboxApp: React.FC = () => {
         socket.emit('client_command', { type, ...data });
     };
 
-    const formatTime = (time: number) => {
-        if (!time || isNaN(time)) return "0:00";
-        if (time > 10000) time = Math.floor(time / 1000);
-        const mins = Math.floor(time / 60);
-        const secs = Math.floor(time % 60);
-        return `${mins}:${secs.toString().padStart(2, '0')}`;
-    };
-
     if (!connected) {
-        return <div className="fixed inset-0 bg-[#0a0a0f] text-white flex items-center justify-center font-bold">Connecting to SonicPulse Host...</div>;
+        return (
+            <div className="h-screen bg-[#0a0a0f] text-white flex flex-col items-center justify-center font-sans">
+                <Loader2 size={48} className="animate-spin text-purple-500 mb-6" />
+                <h1 className="text-2xl font-bold mb-2">Connecting to SonicPulse Host...</h1>
+                <p className="text-gray-400">Please make sure the host is running and you are on the same network.</p>
+            </div>
+        );
     }
 
+    const renderSourceIcon = (source: string) => {
+        switch (source) {
+            case 'netease': return <Disc3 size={20} />;
+            case 'navidrome': return <ListMusic size={20} />;
+            case 'musicfree': return <DownloadCloud size={20} />;
+            case 'local': return <Mic2 size={20} />;
+            default: return <Music2 size={20} />;
+        }
+    };
+
+    const renderSourceName = (source: string) => {
+        switch (source) {
+            case 'netease': return '網易雲';
+            case 'navidrome': return 'Navidrome';
+            case 'musicfree': return '外掛 (MusicFree)';
+            case 'local': return '本機音樂';
+            default: return source;
+        }
+    };
+
+    // Personal Mode full view rendering
+    const renderPersonalModeView = () => {
+        if (!hostState.permissions.personalMode) return null;
+        
+        if (activeSource === 'netease' && neteaseProvider) {
+            return (
+                <NeteaseView 
+                    provider={neteaseProvider}
+                    onPlayTrack={handlePlayTrack}
+                    onPlayNow={handlePlayAll}
+                    onPlayNext={(tracks) => socket?.emit('client_command', { type: 'insert_next', track: tracks[0] })}
+                    onAddToQueue={(tracks) => socket?.emit('client_command', { type: 'insert_last', track: tracks[0] })}
+                    currentTrackId={hostState.currentTrack?.id}
+                    isPlaying={hostState.isPlaying}
+                    isJukebox={true}
+                />
+            );
+        } else if (activeSource === 'navidrome' && naviProvider) {
+            return (
+                <NavidromeView 
+                    provider={naviProvider}
+                    onPlayTrack={handlePlayTrack}
+                    onPlayNow={handlePlayAll}
+                    onPlayNext={(tracks) => socket?.emit('client_command', { type: 'insert_next', track: tracks[0] })}
+                    onAddToQueue={(tracks) => socket?.emit('client_command', { type: 'insert_last', track: tracks[0] })}
+                    currentTrackId={hostState.currentTrack?.id}
+                    isPlaying={hostState.isPlaying}
+                />
+            );
+        } else if (activeSource === 'musicfree' && musicFreeProvider) {
+            return (
+                <MusicFreeView 
+                    provider={musicFreeProvider}
+                    onPlayTrack={handlePlayTrack}
+                    onPlayNow={handlePlayAll}
+                    onPlayNext={(tracks) => socket?.emit('client_command', { type: 'insert_next', track: tracks[0] })}
+                    onAddToQueue={(tracks) => socket?.emit('client_command', { type: 'insert_last', track: tracks[0] })}
+                    currentTrackId={hostState.currentTrack?.id}
+                    isPlaying={hostState.isPlaying}
+                    isJukebox={true}
+                />
+            );
+        }
+        return null;
+    };
+
     return (
-        <div className="fixed inset-y-0 left-0 w-full h-full text-white flex overflow-hidden bg-[#0a0a0f]/90 backdrop-blur-2xl">
-            {/* Atmospheric Glows */}
-            <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-purple-600/10 rounded-full blur-[120px] -z-10 pointer-events-none" />
-            <div className="absolute bottom-0 right-1/4 w-[600px] h-[600px] bg-blue-600/10 rounded-full blur-[150px] -z-10 pointer-events-none" />
-
+        <div className="h-screen bg-[#0a0a0f] text-white flex overflow-hidden font-sans">
             {/* Sidebar */}
-            <div className="w-20 bg-[#050508]/80 backdrop-blur-3xl border-r border-white/10 flex flex-col items-center py-6 gap-6 shrink-0 relative z-20">
-                <div className="flex-1 w-full flex flex-col items-center gap-4 mt-8">
-                    {hostState.permissions.personalMode && (
-                        <button 
-                            onClick={() => setActiveSource('local')}
-                            className={`group w-14 h-14 rounded-2xl flex flex-col items-center justify-center gap-1 transition-all duration-300 ${activeSource === 'local' ? 'bg-purple-500/20 text-purple-300 shadow-[0_0_20px_rgba(168,85,247,0.3)] border border-purple-500/30' : 'text-gray-500 hover:text-gray-300 hover:bg-white/5 hover:border hover:border-white/10'}`}
-                        >
-                            <Library size={20} />
-                            <span className="text-[10px] font-medium">我的</span>
-                        </button>
-                    )}
-                    
-                    {hostState.permissions.allowedSources.includes('navidrome') && (
-                        <button 
-                             onClick={() => setActiveSource('navidrome')}
-                            className={`group w-14 h-14 rounded-2xl flex flex-col items-center justify-center gap-1 transition-all duration-300 ${activeSource === 'navidrome' ? 'bg-purple-500/20 text-purple-300 shadow-[0_0_20px_rgba(168,85,247,0.3)] border border-purple-500/30' : 'text-gray-500 hover:text-gray-300 hover:bg-white/5 hover:border hover:border-white/10'}`}
-                        >
-                            <Server size={20} />
-                            <span className="text-[10px] font-medium">Navi</span>
-                        </button>
-                    )}
-                    
-                    {hostState.permissions.allowedSources.includes('netease') && (
-                        <button 
-                             onClick={() => setActiveSource('netease')}
-                            className={`group w-14 h-14 rounded-2xl flex flex-col items-center justify-center gap-1 transition-all duration-300 ${activeSource === 'netease' ? 'bg-red-500/20 text-red-400 shadow-[0_0_20px_rgba(239,68,68,0.3)] border border-red-500/30' : 'text-gray-500 hover:text-gray-300 hover:bg-white/5 hover:border hover:border-white/10'}`}
-                        >
-                            <Disc size={20} />
-                            <span className="text-[10px] font-medium">網易雲</span>
-                        </button>
-                    )}
-
-                    {hostState.permissions.allowedSources.includes('musicfree') && (
-                        <button 
-                             onClick={() => setActiveSource('musicfree')}
-                            className={`group w-14 h-14 rounded-2xl flex flex-col items-center justify-center gap-1 transition-all duration-300 ${activeSource === 'musicfree' ? 'bg-cyan-500/20 text-cyan-400 shadow-[0_0_20px_rgba(6,182,212,0.3)] border border-cyan-500/30' : 'text-gray-500 hover:text-gray-300 hover:bg-white/5 hover:border hover:border-white/10'}`}
-                        >
-                            <Plug size={20} />
-                            <span className="text-[10px] font-medium">外掛</span>
-                        </button>
-                    )}
+            <div className="w-16 md:w-64 bg-[#12121c] border-r border-white/5 flex flex-col z-20 shrink-0 transition-all duration-300">
+                <div className="h-16 flex items-center justify-center md:justify-start md:px-6 shrink-0 border-b border-white/5">
+                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center shadow-lg shadow-purple-500/20 shrink-0">
+                        <Play fill="white" size={16} className="ml-1" />
+                    </div>
+                    <span className="ml-3 font-bold text-lg hidden md:block tracking-wide bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400">SonicPulse</span>
                 </div>
-
-                <div className="w-full flex flex-col items-center gap-4 mt-auto">
-                    <button 
-                         onClick={() => setActiveSource('settings')}
-                        className={`w-14 h-14 rounded-2xl flex flex-col items-center justify-center gap-1 transition-all duration-300 ${activeSource === 'settings' ? 'bg-purple-500/20 text-purple-300 shadow-[0_0_20px_rgba(168,85,247,0.3)] border border-purple-500/30' : 'text-gray-500 hover:text-gray-300 hover:bg-white/5 hover:border hover:border-white/10'}`}
-                    >
-                        <Settings size={20} />
-                        <span className="text-[10px] font-medium">設定</span>
-                    </button>
+                
+                <div className="flex-1 overflow-y-auto py-4 custom-scrollbar flex flex-col gap-1 px-2 md:px-4">
+                    {hostState.permissions.allowedSources.map(source => (
+                        <button
+                            key={source}
+                            onClick={() => { setActiveSource(source); setSearchResults([]); setSearchQuery(''); }}
+                            className={`flex items-center gap-3 p-3 rounded-xl transition-all group ${
+                                activeSource === source 
+                                    ? 'bg-gradient-to-r from-purple-500/20 to-transparent text-purple-400 font-bold relative overflow-hidden' 
+                                    : 'text-gray-400 hover:text-white hover:bg-white/5'
+                            }`}
+                        >
+                            {activeSource === source && (
+                                <div className="absolute left-0 top-0 bottom-0 w-1 bg-purple-500 shadow-[0_0_10px_rgba(168,85,247,0.5)]"></div>
+                            )}
+                            <div className={`${activeSource === source ? 'text-purple-400' : 'text-gray-500 group-hover:text-gray-300'} transition-colors`}>
+                                {renderSourceIcon(source)}
+                            </div>
+                            <span className="hidden md:block truncate">{renderSourceName(source)}</span>
+                        </button>
+                    ))}
+                    
+                    {/* Settings Button */}
+                    <div className="mt-auto">
+                        <button
+                            onClick={() => setIsSettingsOpen(true)}
+                            className="w-full flex items-center gap-3 p-3 rounded-xl text-gray-400 hover:text-white hover:bg-white/5 transition-all group"
+                        >
+                            <Settings size={20} className="text-gray-500 group-hover:text-gray-300 transition-colors" />
+                            <span className="hidden md:block">點歌機設定</span>
+                        </button>
+                    </div>
                 </div>
             </div>
 
-            {/* Main Content Area */}
-            <div className="flex-1 flex flex-col relative z-10 overflow-hidden pb-24">
-                {activeSource === 'settings' ? (
-                    <div className="p-8 pb-32 max-w-2xl overflow-y-auto h-full">
-                        <h2 className="text-2xl font-bold mb-6 tracking-wide drop-shadow-md flex items-center gap-2"><Settings size={24} className="text-purple-400"/> 點歌機設定</h2>
-                        
-                        <div className="bg-white/5 p-6 rounded-2xl border border-white/5 shadow-inner flex flex-col gap-6">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-300 mb-2">「點擊單曲」行為</label>
-                                <div className="flex gap-4">
-                                    <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
-                                        <input type="radio" name="playSingle" value="insert_next" checked={playSingleBehavior === 'insert_next'} onChange={() => { setPlaySingleBehavior('insert_next'); localStorage.setItem('jukebox_play_single', 'insert_next'); }} className="accent-purple-500" />
-                                        依序插入下一首 (不切歌)
-                                    </label>
-                                    <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
-                                        <input type="radio" name="playSingle" value="insert_last" checked={playSingleBehavior === 'insert_last'} onChange={() => { setPlaySingleBehavior('insert_last'); localStorage.setItem('jukebox_play_single', 'insert_last'); }} className="accent-purple-500" />
-                                        加入序列最後 (不切歌)
-                                    </label>
-                                    <label className={`flex items-center gap-2 text-sm text-gray-300 ${hostState.permissions.allowCutSong ? 'cursor-pointer' : 'opacity-50 cursor-not-allowed'}`}>
-                                        <input type="radio" name="playSingle" value="play_track" disabled={!hostState.permissions.allowCutSong} checked={playSingleBehavior === 'play_track'} onChange={() => { setPlaySingleBehavior('play_track'); localStorage.setItem('jukebox_play_single', 'play_track'); }} className="accent-purple-500" />
-                                        立即播放 (強制切歌)
-                                    </label>
-                                </div>
+            {/* Main Content */}
+            <div className="flex-1 flex flex-col min-w-0 relative pb-24">
+                {/* Search Bar - only show if not in personal mode full view */}
+                {!hostState.permissions.personalMode && (
+                    <div className="p-4 md:p-8 shrink-0 relative z-10 flex items-center gap-4">
+                        <div className="flex-1 relative group max-w-2xl mx-auto">
+                            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                <Search size={20} className="text-gray-400 group-focus-within:text-purple-400 transition-colors" />
                             </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-300 mb-2">「播放全部」行為</label>
-                                <div className="flex gap-4">
-                                    <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
-                                        <input type="radio" name="playAll" value="insert_next" checked={playAllBehavior === 'insert_next'} onChange={() => { setPlayAllBehavior('insert_next'); localStorage.setItem('jukebox_play_all', 'insert_next'); }} className="accent-purple-500" />
-                                        依序插入下一首 (不切歌)
-                                    </label>
-                                    <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
-                                        <input type="radio" name="playAll" value="insert_last" checked={playAllBehavior === 'insert_last'} onChange={() => { setPlayAllBehavior('insert_last'); localStorage.setItem('jukebox_play_all', 'insert_last'); }} className="accent-purple-500" />
-                                        加入序列最後 (不切歌)
-                                    </label>
-                                    <label className={`flex items-center gap-2 text-sm text-gray-300 ${hostState.permissions.allowCutSong ? 'cursor-pointer' : 'opacity-50 cursor-not-allowed'}`}>
-                                        <input type="radio" name="playAll" value="play_track" disabled={!hostState.permissions.allowCutSong} checked={playAllBehavior === 'play_track'} onChange={() => { setPlayAllBehavior('play_track'); localStorage.setItem('jukebox_play_all', 'play_track'); }} className="accent-purple-500" />
-                                        立即播放 (強制切歌)
-                                    </label>
-                                </div>
-                            </div>
+                            <input 
+                                type="text" 
+                                value={searchQuery}
+                                onChange={e => setSearchQuery(e.target.value)}
+                                onKeyDown={e => e.key === 'Enter' && handleSearch()}
+                                placeholder={`在 ${renderSourceName(activeSource)} 中搜尋...`}
+                                className="w-full bg-white/5 border border-white/10 rounded-full py-3 md:py-4 pl-12 pr-4 text-white focus:outline-none focus:border-purple-500/50 focus:bg-white/10 transition-all shadow-inner"
+                            />
                         </div>
+                        <button 
+                            onClick={handleSearch}
+                            className="bg-purple-600 hover:bg-purple-500 text-white px-6 md:px-8 py-3 md:py-4 rounded-full font-bold transition-all shadow-[0_0_20px_rgba(168,85,247,0.3)] hover:shadow-[0_0_30px_rgba(168,85,247,0.5)] whitespace-nowrap"
+                        >
+                            搜尋
+                        </button>
+                    </div>
+                )}
+
+                {/* Content Area */}
+                {hostState.permissions.personalMode ? (
+                    <div className="flex-1 overflow-y-auto custom-scrollbar">
+                        {renderPersonalModeView()}
                     </div>
                 ) : (
-                    <div className="flex-1 flex flex-col p-6 overflow-hidden">
-                        <div className="flex gap-4 mb-6">
-                            <div className="relative flex-1 max-w-xl">
-                                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-                                <input 
-                                    type="text"
-                                    placeholder="搜尋歌曲..."
-                                    value={searchQuery}
-                                    onChange={e => setSearchQuery(e.target.value)}
-                                    onKeyDown={e => e.key === 'Enter' && handleSearch()}
-                                    className="w-full bg-white/5 border border-white/10 rounded-full py-3 pl-12 pr-4 text-sm focus:border-purple-500/50 outline-none transition-colors"
-                                />
-                            </div>
-                            <button onClick={handleSearch} disabled={isSearching} className="bg-purple-600 hover:bg-purple-500 px-6 py-2 rounded-full font-bold text-sm disabled:opacity-50 transition-all shadow-lg active:scale-95">
-                                搜尋
-                            </button>
-                            <button onClick={handlePlayAll} disabled={searchResults.length === 0} className="bg-white/10 hover:bg-white/20 px-6 py-2 rounded-full font-bold text-sm disabled:opacity-50 transition-all active:scale-95 ml-auto border border-white/5">
-                                播放全部
-                            </button>
-                        </div>
-
-                        <div className="flex-1 overflow-y-auto custom-scrollbar">
+                    <div className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar">
+                        <div className="max-w-6xl mx-auto">
                             {isSearching ? (
-                                <div className="text-center py-10 text-gray-400 font-mono animate-pulse">Searching...</div>
+                                <div className="flex flex-col items-center justify-center h-64 text-purple-400">
+                                    <Loader2 size={40} className="animate-spin mb-4" />
+                                    <p>搜尋中...</p>
+                                </div>
                             ) : searchResults.length > 0 ? (
-                                <div className="flex flex-col gap-2">
-                                    {searchResults.map((track, i) => (
-                                        <div 
-                                            key={i} 
-                                            className="flex items-center gap-4 p-3 rounded-xl hover:bg-white/5 border border-transparent hover:border-white/10 transition-all cursor-pointer group"
-                                            onClick={() => handleTrackAction(track, 'single')}
+                                <div>
+                                    <div className="flex justify-between items-center mb-6">
+                                        <h2 className="text-xl md:text-2xl font-bold">搜尋結果</h2>
+                                        <button 
+                                            onClick={() => handlePlayAll(searchResults)}
+                                            className="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-lg font-bold text-sm transition-colors flex items-center gap-2"
                                         >
-                                            <div className="w-10 h-10 bg-white/5 rounded-lg overflow-hidden flex items-center justify-center shrink-0 shadow-inner">
-                                                {track.coverUrl ? <img src={track.coverUrl} className="w-full h-full object-cover" /> : <Music2 size={16} className="text-gray-500" />}
+                                            <Play size={16} fill="currentColor" /> 播放全部
+                                        </button>
+                                    </div>
+                                    <div className="flex flex-col gap-2">
+                                        {searchResults.map((track, i) => (
+                                            <div 
+                                                key={i} 
+                                                onClick={() => handlePlayTrack(track)}
+                                                className="group flex items-center gap-4 p-3 hover:bg-white/5 rounded-xl cursor-pointer transition-all border border-transparent hover:border-white/5"
+                                            >
+                                                <div className="w-12 h-12 bg-white/5 rounded-lg overflow-hidden shrink-0 relative shadow-sm group-hover:shadow-md">
+                                                    {track.coverUrl ? (
+                                                        <img src={track.coverUrl} className="w-full h-full object-cover transition-transform group-hover:scale-105" />
+                                                    ) : (
+                                                        <div className="w-full h-full flex items-center justify-center"><Music2 size={20} className="text-gray-600" /></div>
+                                                    )}
+                                                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        <Play fill="white" size={20} className="ml-1 drop-shadow-md" />
+                                                    </div>
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="font-bold text-gray-200 group-hover:text-white truncate">{track.title}</div>
+                                                    <div className="text-sm text-gray-500 truncate">{track.artist} {track.album ? `· ${track.album}` : ''}</div>
+                                                </div>
+                                                <div className="text-xs text-gray-600 font-mono hidden sm:block w-12 text-right">
+                                                    {formatTime(track.duration)}
+                                                </div>
+                                                <div className="flex gap-1 md:gap-2 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    {hostState.permissions.allowPlayNext && (
+                                                        <>
+                                                            <button 
+                                                                onClick={(e) => { e.stopPropagation(); socket?.emit('client_command', { type: 'insert_next', track }); }}
+                                                                className="p-2 text-gray-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+                                                                title="從下一首插入"
+                                                            >
+                                                                <ListMusic size={18} />
+                                                            </button>
+                                                            <button 
+                                                                onClick={(e) => { e.stopPropagation(); socket?.emit('client_command', { type: 'insert_last', track }); }}
+                                                                className="p-2 text-gray-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+                                                                title="加入歌單最後"
+                                                            >
+                                                                <MoreHorizontal size={18} />
+                                                            </button>
+                                                        </>
+                                                    )}
+                                                </div>
                                             </div>
-                                            <div className="flex-1 min-w-0">
-                                                <div className="font-bold text-sm truncate text-white group-hover:text-purple-300 transition-colors">{track.title}</div>
-                                                <div className="text-xs text-gray-500 truncate">{track.artist}</div>
-                                            </div>
-                                        </div>
-                                    ))}
+                                        ))}
+                                    </div>
                                 </div>
                             ) : (
                                 <div className="flex flex-col items-center justify-center h-full opacity-50">
@@ -329,7 +402,11 @@ export const JukeboxApp: React.FC = () => {
                     </div>
                     <div className="flex-1 overflow-y-auto p-2 custom-scrollbar flex flex-col gap-1">
                         {hostState.queue.map((track, i) => (
-                            <div key={i} className={`flex items-center gap-3 p-2 rounded-lg group ${hostState.queueIndex === i ? 'bg-purple-500/20 border border-purple-500/30' : 'hover:bg-white/5'}`}>
+                            <div 
+                                key={i} 
+                                onClick={() => hostState.permissions.allowCutSong && socket?.emit('client_command', { type: 'play_queue_index', index: i })}
+                                className={`flex items-center gap-3 p-2 rounded-lg group ${hostState.queueIndex === i ? 'bg-purple-500/20 border border-purple-500/30' : 'hover:bg-white/5'} ${hostState.permissions.allowCutSong ? 'cursor-pointer' : ''}`}
+                            >
                                 <div className="flex-1 min-w-0">
                                     <div className={`text-sm truncate ${hostState.queueIndex === i ? 'text-purple-300 font-bold' : 'text-gray-200'}`}>{track.title}</div>
                                     <div className="text-xs text-gray-500 truncate">{track.artist}</div>
@@ -410,6 +487,21 @@ export const JukeboxApp: React.FC = () => {
                     </button>
                 </div>
             </div>
+
+            {/* Settings Modal (Simplified, no playback settings here since host handles it) */}
+            {isSettingsOpen && (
+                <div className="absolute inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
+                    <div className="bg-[#12121c] w-full max-w-md rounded-2xl border border-white/10 overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
+                        <div className="p-4 border-b border-white/10 flex justify-between items-center bg-white/5">
+                            <h2 className="font-bold flex items-center gap-2"><Settings size={18} className="text-gray-400" /> 點歌機設定</h2>
+                            <button onClick={() => setIsSettingsOpen(false)} className="p-2 hover:bg-white/10 rounded-full transition-colors"><X size={16} /></button>
+                        </div>
+                        <div className="p-6">
+                            <p className="text-gray-400 text-sm mb-4">主機已接管點擊單曲與播放全部的行為設定。您可以至主機端介面調整預設行為。</p>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

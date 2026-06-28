@@ -66,6 +66,7 @@ export const MusicPlayerLayout: React.FC<{
     );
     const [jukeboxSocket, setJukeboxSocket] = useState<Socket | null>(null);
     const [lanIp, setLanIp] = useState<string>('');
+    const [availableIps, setAvailableIps] = useState<string[]>([]);
 
     const handleSourceClick = (source: 'local' | 'navidrome' | 'netease' | 'musicfree' | 'settings') => {
         if (activeSource === source) {
@@ -533,7 +534,10 @@ export const MusicPlayerLayout: React.FC<{
             setQueueIndex,
             playTrackUrl,
             currentTrack,
-            handleToggleLike
+            handleToggleLike,
+            queue,
+            playTrack,
+            playNow
         };
     });
 
@@ -563,7 +567,16 @@ export const MusicPlayerLayout: React.FC<{
                 // Fetch LAN IP
                 fetch('http://127.0.0.1:30001/ip')
                     .then(res => res.json())
-                    .then(ipData => setLanIp(ipData.ip))
+                    .then(ipData => {
+                        const ips = ipData.ips || [ipData.ip];
+                        setAvailableIps(ips);
+                        const savedIp = localStorage.getItem('jukebox_lan_ip');
+                        if (savedIp && ips.includes(savedIp)) {
+                            setLanIp(savedIp);
+                        } else {
+                            setLanIp(ipData.ip);
+                        }
+                    })
                     .catch(console.error);
                 const socket = io(`http://127.0.0.1:${jukeboxPort}`);
                 setJukeboxSocket(socket);
@@ -576,7 +589,7 @@ export const MusicPlayerLayout: React.FC<{
                 let currentSocket = socket;
 
                 socket.on('client_command', async (cmd: any) => {
-                    const s = jukeboxStateRef.current;
+                    const s: any = jukeboxStateRef.current;
                     console.log('Jukebox Command:', cmd);
                     if (cmd.type === 'search') {
                         let results: Track[] = [];
@@ -623,16 +636,26 @@ export const MusicPlayerLayout: React.FC<{
                         s.playNext([cmd.track]);
                     } else if (cmd.type === 'insert_last' && s.jukeboxAllowPlayNext) {
                         s.addToQueue([cmd.track]);
+                    } else if (cmd.type === 'host_play_track') {
+                        s.playTrack(cmd.track);
+                    } else if (cmd.type === 'host_play_now') {
+                        s.playNow(cmd.tracks);
+                    } else if (cmd.type === 'play_queue_index') {
+                        if (s.jukeboxAllowCutSong) {
+                            s.setQueueIndex(cmd.index);
+                            s.playTrackUrl(s.queue[cmd.index]);
+                        }
                     } else if (cmd.type === 'toggle_roaming') {
-                        // Will implement roaming toggle event
                         window.dispatchEvent(new CustomEvent('sonicpulse-toggle-roaming'));
                     } else if (cmd.type === 'get_personal_data' && s.jukeboxPersonalMode) {
-                        currentSocket.emit('host_personal_data', { 
-                            likedIds: (window as any).__sonicpulse_liked_ids || [],
-                            // Can add history and playlists later
+                        currentSocket.emit('personal_data', {
+                            neteaseCookie: localStorage.getItem('netease_cookie'),
+                            neteaseUid: localStorage.getItem('netease_uid'),
+                            navidromeUrl: localStorage.getItem('navidrome_server_url'),
+                            navidromeUser: localStorage.getItem('navidrome_username'),
+                            navidromePass: localStorage.getItem('navidrome_password')
                         });
                     } else if (cmd.type === 'toggle_heart' && s.jukeboxPersonalMode) {
-                        // Optimistic dispatch to update local UI immediately if it's the current track
                         if (cmd.trackId === s.currentTrack?.id) {
                             s.handleToggleLike();
                         } else {
@@ -1031,43 +1054,73 @@ export const MusicPlayerLayout: React.FC<{
                                                 <h3 className="text-lg font-bold mb-6 flex items-center gap-2"><Settings2 size={20} className="text-yellow-400" /> {t('settings.preferences.playBehavior') || '播放行為'}</h3>
                                                 
                                                 <div className="space-y-6">
-                                                    <div>
-                                                        <label className="block text-sm font-medium text-gray-300 mb-2">{t('settings.preferences.playAllBehavior') || '「播放全部」行為'}</label>
-                                                        <div className="flex gap-4">
-                                                            <label className="flex items-center gap-2 cursor-pointer bg-[#151520] px-4 py-3 rounded-xl border border-white/10 flex-1 hover:border-yellow-500/50 transition-colors">
-                                                                <input type="radio" name="playAll" value="replace" checked={playAllBehavior === 'replace'} onChange={() => {
-                                                                    setPlayAllBehavior('replace');
-                                                                    localStorage.setItem('sonicpulse_play_all_behavior', 'replace');
-                                                                }} className="text-yellow-500 focus:ring-yellow-500" />
-                                                                <span className="text-sm">{t('settings.preferences.behaviorReplace') || '清除序列並播放'}</span>
-                                                            </label>
-                                                            <label className="flex items-center gap-2 cursor-pointer bg-[#151520] px-4 py-3 rounded-xl border border-white/10 flex-1 hover:border-yellow-500/50 transition-colors">
-                                                                <input type="radio" name="playAll" value="insert" checked={playAllBehavior === 'insert'} onChange={() => {
-                                                                    setPlayAllBehavior('insert');
-                                                                    localStorage.setItem('sonicpulse_play_all_behavior', 'insert');
-                                                                }} className="text-yellow-500 focus:ring-yellow-500" />
-                                                                <span className="text-sm">{t('settings.preferences.behaviorInsert') || '插入並立刻播放'}</span>
-                                                            </label>
+                                                    <div className="flex flex-col gap-6">
+                                                        <div>
+                                                            <label className="block text-sm font-medium text-gray-300 mb-2">{t('settings.preferences.playSingleBehavior') || '「點擊單曲」行為'}</label>
+                                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                                <label className="flex items-center gap-2 cursor-pointer bg-[#151520] px-4 py-3 rounded-xl border border-white/10 hover:border-yellow-500/50 transition-colors">
+                                                                    <input type="radio" name="playSingle" value="replace" checked={playSingleBehavior === 'replace'} onChange={() => {
+                                                                        setPlaySingleBehavior('replace');
+                                                                        localStorage.setItem('sonicpulse_play_single_behavior', 'replace');
+                                                                    }} className="text-yellow-500 focus:ring-yellow-500" />
+                                                                    <span className="text-sm">{t('settings.preferences.behaviorReplace') || '清除序列並播放'}</span>
+                                                                </label>
+                                                                <label className="flex items-center gap-2 cursor-pointer bg-[#151520] px-4 py-3 rounded-xl border border-white/10 hover:border-yellow-500/50 transition-colors">
+                                                                    <input type="radio" name="playSingle" value="insert" checked={playSingleBehavior === 'insert'} onChange={() => {
+                                                                        setPlaySingleBehavior('insert');
+                                                                        localStorage.setItem('sonicpulse_play_single_behavior', 'insert');
+                                                                    }} className="text-yellow-500 focus:ring-yellow-500" />
+                                                                    <span className="text-sm">{t('settings.preferences.behaviorInsert') || '插入並立刻播放'}</span>
+                                                                </label>
+                                                                <label className="flex items-center gap-2 cursor-pointer bg-[#151520] px-4 py-3 rounded-xl border border-white/10 hover:border-yellow-500/50 transition-colors">
+                                                                    <input type="radio" name="playSingle" value="insert_next" checked={playSingleBehavior === 'insert_next'} onChange={() => {
+                                                                        setPlaySingleBehavior('insert_next');
+                                                                        localStorage.setItem('sonicpulse_play_single_behavior', 'insert_next');
+                                                                    }} className="text-yellow-500 focus:ring-yellow-500" />
+                                                                    <span className="text-sm">{t('settings.preferences.behaviorInsertNext') || '從下一首插入(不切換)'}</span>
+                                                                </label>
+                                                                <label className="flex items-center gap-2 cursor-pointer bg-[#151520] px-4 py-3 rounded-xl border border-white/10 hover:border-yellow-500/50 transition-colors">
+                                                                    <input type="radio" name="playSingle" value="insert_last" checked={playSingleBehavior === 'insert_last'} onChange={() => {
+                                                                        setPlaySingleBehavior('insert_last');
+                                                                        localStorage.setItem('sonicpulse_play_single_behavior', 'insert_last');
+                                                                    }} className="text-yellow-500 focus:ring-yellow-500" />
+                                                                    <span className="text-sm">{t('settings.preferences.behaviorInsertLast') || '從最後插入(不切換)'}</span>
+                                                                </label>
+                                                            </div>
                                                         </div>
-                                                    </div>
 
-                                                    <div>
-                                                        <label className="block text-sm font-medium text-gray-300 mb-2">{t('settings.preferences.playSingleBehavior') || '「點擊單曲」行為'}</label>
-                                                        <div className="flex gap-4">
-                                                            <label className="flex items-center gap-2 cursor-pointer bg-[#151520] px-4 py-3 rounded-xl border border-white/10 flex-1 hover:border-yellow-500/50 transition-colors">
-                                                                <input type="radio" name="playSingle" value="replace" checked={playSingleBehavior === 'replace'} onChange={() => {
-                                                                    setPlaySingleBehavior('replace');
-                                                                    localStorage.setItem('sonicpulse_play_single_behavior', 'replace');
-                                                                }} className="text-yellow-500 focus:ring-yellow-500" />
-                                                                <span className="text-sm">{t('settings.preferences.behaviorReplace') || '清除序列並播放'}</span>
-                                                            </label>
-                                                            <label className="flex items-center gap-2 cursor-pointer bg-[#151520] px-4 py-3 rounded-xl border border-white/10 flex-1 hover:border-yellow-500/50 transition-colors">
-                                                                <input type="radio" name="playSingle" value="insert" checked={playSingleBehavior === 'insert'} onChange={() => {
-                                                                    setPlaySingleBehavior('insert');
-                                                                    localStorage.setItem('sonicpulse_play_single_behavior', 'insert');
-                                                                }} className="text-yellow-500 focus:ring-yellow-500" />
-                                                                <span className="text-sm">{t('settings.preferences.behaviorInsert') || '插入並立刻播放'}</span>
-                                                            </label>
+                                                        <div>
+                                                            <label className="block text-sm font-medium text-gray-300 mb-2">{t('settings.preferences.playAllBehavior') || '「播放全部」行為'}</label>
+                                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                                <label className="flex items-center gap-2 cursor-pointer bg-[#151520] px-4 py-3 rounded-xl border border-white/10 hover:border-yellow-500/50 transition-colors">
+                                                                    <input type="radio" name="playAll" value="replace" checked={playAllBehavior === 'replace'} onChange={() => {
+                                                                        setPlayAllBehavior('replace');
+                                                                        localStorage.setItem('sonicpulse_play_all_behavior', 'replace');
+                                                                    }} className="text-yellow-500 focus:ring-yellow-500" />
+                                                                    <span className="text-sm">{t('settings.preferences.behaviorReplace') || '清除序列並播放'}</span>
+                                                                </label>
+                                                                <label className="flex items-center gap-2 cursor-pointer bg-[#151520] px-4 py-3 rounded-xl border border-white/10 hover:border-yellow-500/50 transition-colors">
+                                                                    <input type="radio" name="playAll" value="insert" checked={playAllBehavior === 'insert'} onChange={() => {
+                                                                        setPlayAllBehavior('insert');
+                                                                        localStorage.setItem('sonicpulse_play_all_behavior', 'insert');
+                                                                    }} className="text-yellow-500 focus:ring-yellow-500" />
+                                                                    <span className="text-sm">{t('settings.preferences.behaviorInsert') || '插入並立刻播放'}</span>
+                                                                </label>
+                                                                <label className="flex items-center gap-2 cursor-pointer bg-[#151520] px-4 py-3 rounded-xl border border-white/10 hover:border-yellow-500/50 transition-colors">
+                                                                    <input type="radio" name="playAll" value="insert_next" checked={playAllBehavior === 'insert_next'} onChange={() => {
+                                                                        setPlayAllBehavior('insert_next');
+                                                                        localStorage.setItem('sonicpulse_play_all_behavior', 'insert_next');
+                                                                    }} className="text-yellow-500 focus:ring-yellow-500" />
+                                                                    <span className="text-sm">{t('settings.preferences.behaviorInsertNext') || '從下一首插入(不切換)'}</span>
+                                                                </label>
+                                                                <label className="flex items-center gap-2 cursor-pointer bg-[#151520] px-4 py-3 rounded-xl border border-white/10 hover:border-yellow-500/50 transition-colors">
+                                                                    <input type="radio" name="playAll" value="insert_last" checked={playAllBehavior === 'insert_last'} onChange={() => {
+                                                                        setPlayAllBehavior('insert_last');
+                                                                        localStorage.setItem('sonicpulse_play_all_behavior', 'insert_last');
+                                                                    }} className="text-yellow-500 focus:ring-yellow-500" />
+                                                                    <span className="text-sm">{t('settings.preferences.behaviorInsertLast') || '從最後插入(不切換)'}</span>
+                                                                </label>
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -1101,12 +1154,27 @@ export const MusicPlayerLayout: React.FC<{
                                                                 <div className="bg-white p-2 rounded-lg">
                                                                     <QRCode value={`http://${lanIp}:${jukeboxPort}/jukebox.html`} size={120} />
                                                                 </div>
-                                                                <div className="flex flex-col flex-1">
+                                                                <div className="flex flex-col flex-1 w-full">
                                                                     <h4 className="font-bold text-white mb-2">邀請朋友來點歌！</h4>
                                                                     <p className="text-sm text-gray-400 mb-3">請他們連接相同的 Wi-Fi，然後掃描左側條碼，或直接在瀏覽器輸入以下網址：</p>
-                                                                    <a href={`http://${lanIp}:${jukeboxPort}/jukebox.html`} target="_blank" rel="noreferrer" className="text-purple-400 font-mono text-sm hover:underline p-2 bg-white/5 rounded-lg text-center break-all">
+                                                                    <a href={`http://${lanIp}:${jukeboxPort}/jukebox.html`} target="_blank" rel="noreferrer" className="text-purple-400 font-mono text-sm hover:underline p-2 bg-white/5 rounded-lg text-center break-all mb-4">
                                                                         http://{lanIp}:{jukeboxPort}/jukebox.html
                                                                     </a>
+                                                                    {availableIps.length > 1 && (
+                                                                        <div className="mt-2">
+                                                                            <label className="text-xs text-gray-400 block mb-1">切換連線 IP (如果您使用虛擬網卡或 VPN)：</label>
+                                                                            <select 
+                                                                                value={lanIp}
+                                                                                onChange={(e) => {
+                                                                                    setLanIp(e.target.value);
+                                                                                    localStorage.setItem('jukebox_lan_ip', e.target.value);
+                                                                                }}
+                                                                                className="bg-[#151520] border border-white/10 rounded-lg px-3 py-2 text-sm w-full focus:border-purple-500 outline-none"
+                                                                            >
+                                                                                {availableIps.map(ip => <option key={ip} value={ip}>{ip}</option>)}
+                                                                            </select>
+                                                                        </div>
+                                                                    )}
                                                                 </div>
                                                             </div>
                                                         )}

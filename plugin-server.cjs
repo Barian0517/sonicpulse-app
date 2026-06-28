@@ -15,23 +15,18 @@ app.use(express.json());
 
 app.get('/ip', (req, res) => {
     const interfaces = os.networkInterfaces();
-    let fallbackIp = null;
+    let ips = [];
     for (const devName in interfaces) {
         const iface = interfaces[devName];
         for (let i = 0; i < iface.length; i++) {
             const alias = iface[i];
             if (alias.family === 'IPv4' && alias.address !== '127.0.0.1' && !alias.internal) {
-                // Prioritize standard local LAN ranges
-                if (alias.address.startsWith('192.168.') || 
-                    alias.address.startsWith('10.') || 
-                    alias.address.match(/^172\.(1[6-9]|2\d|3[0-1])\./)) {
-                    return res.json({ ip: alias.address });
-                }
-                if (!fallbackIp) fallbackIp = alias.address;
+                ips.push(alias.address);
             }
         }
     }
-    res.json({ ip: fallbackIp || '127.0.0.1' });
+    let defaultIp = ips.find(ip => ip.startsWith('192.168.') || ip.startsWith('10.') || ip.match(/^172\.(1[6-9]|2\d|3[0-1])\./)) || ips[0] || '127.0.0.1';
+    res.json({ ip: defaultIp, ips: ips });
 });
 
 process.on('unhandledRejection', (reason, promise) => {

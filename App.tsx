@@ -226,6 +226,12 @@ const App: React.FC = () => {
   const [roamTrackIndex, setRoamTrackIndex] = useState(-1);
   const [isRoamingMode, setIsRoamingMode] = useState(false);
 
+  useEffect(() => {
+    const handleToggleRoaming = () => setIsRoamingMode(prev => !prev);
+    window.addEventListener('sonicpulse-toggle-roaming', handleToggleRoaming);
+    return () => window.removeEventListener('sonicpulse-toggle-roaming', handleToggleRoaming);
+  }, []);
+
   const playlist = isRoamingMode ? roamPlaylist : mainPlaylist;
   const currentTrackIndex = isRoamingMode ? roamTrackIndex : mainTrackIndex;
 

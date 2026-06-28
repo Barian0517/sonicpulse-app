@@ -1,7 +1,15 @@
 import MD5 from 'crypto-js/md5';
-import { fetch as tauriFetch } from '@tauri-apps/plugin-http';
 import { MusicProvider, Track, Album, Playlist, Artist } from './MusicProvider';
 import { offlineManager } from './OfflineManager';
+
+const adaptiveFetch = async (url: string, options: any) => {
+    if (typeof window !== 'undefined' && (window as any).__TAURI__) {
+        const { fetch: adaptiveFetch } = await import('@tauri-apps/plugin-http');
+        return adaptiveFetch(url, options);
+    } else {
+        return fetch(url, options);
+    }
+};
 
 export class NavidromeProvider implements MusicProvider {
     name = 'Navidrome';
@@ -43,7 +51,7 @@ export class NavidromeProvider implements MusicProvider {
         const urlParams = searchParams.toString();
         const fullUrl = `${this.serverUrl}/rest/${endpoint}?${this.getAuthParams()}${urlParams ? '&' + urlParams : ''}`;
         
-        const res = await tauriFetch(fullUrl, { method: 'GET' });
+        const res = await adaptiveFetch(fullUrl, { method: 'GET' });
         const json = await res.json();
         
         if (json['subsonic-response']?.status === 'failed') {
@@ -346,7 +354,7 @@ export class NavidromeProvider implements MusicProvider {
             
             const url = `${this.serverUrl}/rest/getLyricsBySongId?${searchParams.toString()}`;
             
-            const res = await tauriFetch(url, { method: 'GET' });
+            const res = await adaptiveFetch(url, { method: 'GET' });
             const json = await res.json();
             const response = json['subsonic-response'];
             

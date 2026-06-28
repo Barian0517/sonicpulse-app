@@ -49,8 +49,8 @@
       "playSingleBehavior": "「點擊單曲」行為",
       "behaviorReplace": "清除序列並播放",
       "behaviorInsert": "插入並立刻播放",
-      "behaviorInsertNextNoPlay": "依序插入下一首 (不切歌)",
-      "behaviorInsertLastNoPlay": "從最後插入 (不切歌)"
+      "behaviorInsertNext": "從下一首依序插入 (不切歌)",
+      "behaviorInsertLast": "從最後插入 (不切歌)"
     },
     "jukebox": {
       "title": "線上點歌 (Jukebox)",
