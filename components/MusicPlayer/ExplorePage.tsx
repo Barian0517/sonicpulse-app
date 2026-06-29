@@ -36,9 +36,13 @@ export const ExplorePage: React.FC<{
                     try {
                         const liked = await provider.getStarred();
                         if (liked.tracks && liked.tracks.length > 0) {
-                            const latestLiked = liked.tracks[0];
-                            const similar = await (provider as any).getSimilarSongs(latestLiked.id);
-                            setNeteaseRecommendations([latestLiked, ...similar.slice(0, 5)]);
+                            const randomIndex = Math.floor(Math.random() * liked.tracks.length);
+                            const randomLiked = liked.tracks[randomIndex];
+                            const similar = await (provider as any).getSimilarSongs(randomLiked.id);
+                            
+                            // Try to shuffle similar songs if there are many
+                            const shuffledSimilar = [...similar].sort(() => 0.5 - Math.random());
+                            setNeteaseRecommendations([randomLiked, ...shuffledSimilar.slice(0, 5)]);
                         }
                     } catch(e) { console.error("Failed to fetch netease recommendations", e); }
                 }
@@ -46,7 +50,8 @@ export const ExplorePage: React.FC<{
                 // To properly implement Explore, we need specific Subsonic API calls like getRandomSongs, getTopSongs, etc.
                 // We will just use getTracks for now and pretend for the UI placeholder.
                 const random = await provider.getTracks(); // TODO: Add 'type=random' support to NavidromeProvider
-                setRandomTracks(random.slice(0, 10));
+                const shuffledRandom = [...random].sort(() => 0.5 - Math.random());
+                setRandomTracks(shuffledRandom.slice(0, 10));
             } catch (e) {
                 console.error(e);
             }
