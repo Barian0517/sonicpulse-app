@@ -47,6 +47,9 @@ jobs:
       - name: install frontend dependencies
         run: npm install
 
+      - name: build frontend assets
+        run: npm run build
+
       - name: compile backend sidecar
         shell: bash
         run: |

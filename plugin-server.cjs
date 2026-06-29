@@ -14,7 +14,6 @@ require('cheerio');
 require('dayjs');
 require('he');
 require('big-integer');
-require('webdav');
 require('crypto-js');
 
 const app = express();
