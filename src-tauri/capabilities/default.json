@@ -18,6 +18,15 @@
     "core:window:allow-start-dragging",
     "core:window:allow-destroy",
     "dialog:default",
-    "shell:allow-open"
+    "shell:allow-open",
+    {
+      "identifier": "shell:allow-spawn",
+      "allow": [
+        {
+          "name": "binaries/backend",
+          "sidecar": true
+        }
+      ]
+    }
   ]
 }
