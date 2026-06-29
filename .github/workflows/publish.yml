@@ -54,12 +54,16 @@ jobs:
             const fs = require('fs');
             const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
             const tauri = JSON.parse(fs.readFileSync('src-tauri/tauri.conf.json', 'utf8'));
-            const newVersion = '0.1.' + process.env.GITHUB_RUN_NUMBER;
+            const cargoToml = fs.readFileSync('src-tauri/Cargo.toml', 'utf8');
+            const [major, minor] = pkg.version.split('.');
+            const patch = Math.max(0, parseInt(process.env.GITHUB_RUN_NUMBER) - 20);
+            const newVersion = major + '.' + minor + '.' + patch;
             console.log('Updating version to: ' + newVersion);
             pkg.version = newVersion;
             tauri.version = newVersion;
             fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2));
             fs.writeFileSync('src-tauri/tauri.conf.json', JSON.stringify(tauri, null, 2));
+            fs.writeFileSync('src-tauri/Cargo.toml', cargoToml.replace(/^version = \".*\"/m, 'version = \"' + newVersion + '\"'));
           "
         env:
           GITHUB_RUN_NUMBER: ${{ github.run_number }}
