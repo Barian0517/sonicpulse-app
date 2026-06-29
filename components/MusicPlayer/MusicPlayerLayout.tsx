@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Settings, Settings2, Music2, Disc, PlaySquare, Search, Library, FolderOpen, Play, Pause, SkipBack, SkipForward, Server, ChevronLeft, Heart, RefreshCw, Plug, Terminal } from 'lucide-react';
+import { Settings, Settings2, Music2, Disc, PlaySquare, Search, Library, FolderOpen, Play, Pause, SkipBack, SkipForward, Server, ChevronLeft, Heart, RefreshCw, Plug, Terminal, Info } from 'lucide-react';
+import { AuthorCard } from './AuthorCard';
 import { open } from '@tauri-apps/plugin-dialog';
 import { convertFileSrc } from '@tauri-apps/api/core';
 import { LocalProvider } from '../../providers/LocalProvider';
@@ -39,6 +40,7 @@ export const MusicPlayerLayout: React.FC<{
     
     // Settings Tab State
     const [activeSettingsTab, setActiveSettingsTab] = useState<'basic' | 'storage' | 'server' | 'jukebox' | 'preferences' | 'debug'>('basic');
+    const [showAuthorCard, setShowAuthorCard] = useState(false);
     
     // Preferences State
     type PlayBehavior = 'replace' | 'insert' | 'insert_next' | 'insert_last';
@@ -882,6 +884,14 @@ export const MusicPlayerLayout: React.FC<{
                         <Settings size={20} />
                         <span className="text-[10px] font-medium">{t('sidebar.settings')}</span>
                     </button>
+
+                    <button 
+                         onClick={() => setShowAuthorCard(true)}
+                         className="w-14 h-14 rounded-2xl flex flex-col items-center justify-center gap-1 transition-all duration-300 text-gray-500 hover:text-gray-300 hover:bg-white/5 hover:border hover:border-white/10"
+                    >
+                        <Info size={20} />
+                        <span className="text-[10px] font-medium">關於作者</span>
+                    </button>
                 </div>
             </div>
 
@@ -1384,6 +1394,7 @@ export const MusicPlayerLayout: React.FC<{
                     </div>
                 </div>
             </div>
+            {showAuthorCard && <AuthorCard onClose={() => setShowAuthorCard(false)} />}
         </div>
     );
 };

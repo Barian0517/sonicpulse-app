@@ -87,6 +87,7 @@ pub fn run() {
                 .build(),
         )
         .plugin(tauri_plugin_fs::init())
+        .plugin(tauri_plugin_shell::init())
         .setup(|app| {
             app.handle().plugin(tauri_plugin_dialog::init())?;
             app.handle().plugin(tauri_plugin_http::init())?;
