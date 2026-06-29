@@ -45,7 +45,9 @@
       "node_modules/NeteaseCloudMusicApi/util/*.js"
     ],
     "assets": [
-      "musicfree-plugin/**/*"
+      "musicfree-plugin/**/*",
+      "dist/**/*",
+      "dist-jukebox/**/*"
     ]
   },
   "devDependencies": {

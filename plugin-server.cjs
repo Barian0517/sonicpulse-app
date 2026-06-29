@@ -36,7 +36,30 @@ process.on('uncaughtException', (err) => {
     console.error('Uncaught Exception from a plugin:', err instanceof Error ? err.message : err);
 });
 
-const configPath = path.join(process.cwd(), 'musicfree-config.json');
+const isPkg = typeof process.pkg !== 'undefined';
+const dataDir = isPkg ? path.join(os.homedir(), '.sonicpulse') : __dirname;
+
+if (isPkg && !fs.existsSync(dataDir)) {
+    try {
+        fs.mkdirSync(dataDir, { recursive: true });
+    } catch(e) {
+        console.error("Failed to create data dir", e);
+    }
+}
+
+// Copy default plugins if running in pkg and they don't exist in dataDir
+const defaultPluginDir = path.join(__dirname, 'musicfree-plugin');
+const userPluginDir = path.join(dataDir, 'musicfree-plugin');
+
+if (isPkg && !fs.existsSync(userPluginDir) && fs.existsSync(defaultPluginDir)) {
+    try {
+        fs.cpSync(defaultPluginDir, userPluginDir, { recursive: true });
+    } catch(e) {
+        console.error("Failed to copy default plugins", e);
+    }
+}
+
+const configPath = path.join(dataDir, 'musicfree-config.json');
 
 function getConfig() {
     if (fs.existsSync(configPath)) {
@@ -45,7 +68,7 @@ function getConfig() {
         } catch (e) {}
     }
     return { 
-        pluginDir: path.join(process.cwd(), 'musicfree-plugin'),
+        pluginDir: userPluginDir,
         variables: {} // { "pluginId": { "music_u": "...", "source": "..." } }
     };
 }
@@ -332,7 +355,7 @@ let hostSocket = null;
 let lastHostState = null;
 
 // Serve the Jukebox frontend files
-app.use('/jukebox', express.static(path.join(process.cwd(), 'dist-jukebox')));
+app.use('/jukebox', express.static(path.join(__dirname, 'dist-jukebox')));
 
 // Configure Jukebox API (called by Tauri Host)
 app.post('/jukebox/configure', (req, res) => {
@@ -394,7 +417,7 @@ app.post('/jukebox/configure', (req, res) => {
             }
         });
 
-        const distPath = path.join(process.cwd(), 'dist');
+        const distPath = path.join(__dirname, 'dist');
         jukeboxApp.use(express.static(distPath));
         
         jukeboxApp.use((req, res) => {
