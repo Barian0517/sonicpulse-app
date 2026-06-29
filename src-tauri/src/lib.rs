@@ -2,7 +2,6 @@ mod audio;
 
 use std::fs::{File, OpenOptions};
 use std::io::Write;
-use std::path::Path;
 use chrono::Local;
 
 #[tauri::command]

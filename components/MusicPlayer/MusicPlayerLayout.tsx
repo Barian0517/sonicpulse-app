@@ -97,7 +97,20 @@ export const MusicPlayerLayout: React.FC<{
     const [tracks, setTracks] = useState<Track[]>([]);
     const [albums, setAlbums] = useState<Album[]>([]);
     
-    const [currentTrack, setCurrentTrack] = useState<Track | null>(null);
+    const [currentTrack, setCurrentTrack] = useState<Track | null>(() => {
+        if (localStorage.getItem('sonicpulse_save_queue') !== 'false') {
+            const savedQ = localStorage.getItem('sonicpulse_saved_queue');
+            const savedIdx = localStorage.getItem('sonicpulse_saved_queue_index');
+            if (savedQ && savedIdx) {
+                try {
+                    const parsedQ = JSON.parse(savedQ);
+                    const parsedIdx = parseInt(savedIdx);
+                    if (parsedQ && parsedQ[parsedIdx]) return parsedQ[parsedIdx];
+                } catch(e) {}
+            }
+        }
+        return null;
+    });
     const [isHoveringTimeline, setIsHoveringTimeline] = useState(false);
     const [isCurrentTrackLiked, setIsCurrentTrackLiked] = useState(false);
 
@@ -185,8 +198,23 @@ export const MusicPlayerLayout: React.FC<{
     };
 
     // Queue State
-    const [queue, setQueue] = useState<Track[]>([]);
-    const [queueIndex, setQueueIndex] = useState(-1);
+    const [saveQueueState, setSaveQueueState] = useState(localStorage.getItem('sonicpulse_save_queue') !== 'false');
+    const [queue, setQueue] = useState<Track[]>(() => {
+        if (localStorage.getItem('sonicpulse_save_queue') !== 'false') {
+            const saved = localStorage.getItem('sonicpulse_saved_queue');
+            if (saved) {
+                try { return JSON.parse(saved); } catch(e) {}
+            }
+        }
+        return [];
+    });
+    const [queueIndex, setQueueIndex] = useState(() => {
+        if (localStorage.getItem('sonicpulse_save_queue') !== 'false') {
+            const saved = localStorage.getItem('sonicpulse_saved_queue_index');
+            if (saved) return parseInt(saved);
+        }
+        return -1;
+    });
 
     // Navidrome Settings State
     const [naviUrl, setNaviUrl] = useState(localStorage.getItem('navidrome_url') || '');
@@ -490,8 +518,15 @@ export const MusicPlayerLayout: React.FC<{
         if (onQueueUpdate) {
             onQueueUpdate(queue, queueIndex);
         }
+        if (saveQueueState) {
+            localStorage.setItem('sonicpulse_saved_queue', JSON.stringify(queue));
+            localStorage.setItem('sonicpulse_saved_queue_index', String(queueIndex));
+        } else {
+            localStorage.removeItem('sonicpulse_saved_queue');
+            localStorage.removeItem('sonicpulse_saved_queue_index');
+        }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [queue, queueIndex]);
+    }, [queue, queueIndex, saveQueueState]);
 
     const jukeboxStateRef = useRef({
         neteaseProvider,
@@ -1157,6 +1192,18 @@ export const MusicPlayerLayout: React.FC<{
                                                                 </label>
                                                             </div>
                                                         </div>
+
+                                                        <div className="bg-black/20 p-4 rounded-xl border border-white/5 flex flex-col gap-3">
+                                                            <h4 className="text-sm font-bold text-gray-300 mb-1">播放序列</h4>
+                                                            <label className="flex items-center gap-2 cursor-pointer">
+                                                                <input type="checkbox" checked={saveQueueState} onChange={e => {
+                                                                    setSaveQueueState(e.target.checked);
+                                                                    localStorage.setItem('sonicpulse_save_queue', String(e.target.checked));
+                                                                }} className="accent-purple-500" />
+                                                                <span className="text-sm text-gray-300">記住播放序列 (重啟時恢復上次播放清單)</span>
+                                                            </label>
+                                                        </div>
+
                                                     </div>
                                                 </div>
                                             </div>
@@ -1394,7 +1441,7 @@ export const MusicPlayerLayout: React.FC<{
                     </div>
                 </div>
             </div>
-            {showAuthorCard && <AuthorCard onClose={() => setShowAuthorCard(false)} />}
+            <AuthorCard isOpen={showAuthorCard} onClose={() => setShowAuthorCard(false)} />
         </div>
     );
 };

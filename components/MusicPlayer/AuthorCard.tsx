@@ -1,12 +1,38 @@
-import React from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { Youtube, Facebook, Github, Globe, Gamepad2, Server, X } from 'lucide-react';
 import { open } from '@tauri-apps/plugin-shell';
 
 interface AuthorCardProps {
+    isOpen: boolean;
     onClose: () => void;
 }
 
-export const AuthorCard: React.FC<AuthorCardProps> = ({ onClose }) => {
+export const AuthorCard: React.FC<AuthorCardProps> = ({ isOpen, onClose }) => {
+    const cardRef = useRef<HTMLDivElement>(null);
+    const [tilt, setTilt] = useState({ x: 0, y: 0 });
+    const [isHovering, setIsHovering] = useState(false);
+
+    const handleMouseMove = (e: React.MouseEvent) => {
+        if (!cardRef.current) return;
+        const rect = cardRef.current.getBoundingClientRect();
+        const x = e.clientX - rect.left - rect.width / 2;
+        const y = e.clientY - rect.top - rect.height / 2;
+        const multiplier = 20; 
+        setTilt({
+            x: -(y / rect.height) * multiplier,
+            y: (x / rect.width) * multiplier
+        });
+    };
+
+    const handleMouseLeave = () => {
+        setIsHovering(false);
+        setTilt({ x: 0, y: 0 });
+    };
+
+    const handleMouseEnter = () => {
+        setIsHovering(true);
+    };
+
     const handleLinkClick = async (e: React.MouseEvent<HTMLAnchorElement>) => {
         e.preventDefault();
         try {
@@ -18,26 +44,39 @@ export const AuthorCard: React.FC<AuthorCardProps> = ({ onClose }) => {
     };
 
     return (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-300">
+        <div 
+            className={`fixed inset-0 z-[100] flex items-center justify-center p-4 transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] ${isOpen ? 'opacity-100 pointer-events-auto bg-black/60 backdrop-blur-sm' : 'opacity-0 pointer-events-none bg-black/0 backdrop-blur-none'}`}
+        >
             {/* Close Overlay */}
             <div className="absolute inset-0 cursor-pointer" onClick={onClose}></div>
             
-            <div className="relative flex flex-col md:flex-row w-full max-w-4xl bg-[#1a2233]/80 backdrop-blur-xl border border-white/10 rounded-2xl p-8 md:p-12 overflow-hidden shadow-2xl">
-                <button onClick={onClose} className="absolute top-4 right-4 z-50 p-2 text-white/50 hover:text-white bg-white/5 hover:bg-white/10 rounded-full transition-all">
+            <div 
+                ref={cardRef}
+                onMouseMove={handleMouseMove}
+                onMouseLeave={handleMouseLeave}
+                onMouseEnter={handleMouseEnter}
+                style={{
+                    transform: `perspective(1000px) rotateX(${tilt.x}deg) rotateY(${tilt.y}deg)`,
+                    transition: isHovering ? 'transform 0.1s ease-out' : 'transform 0.5s ease-out',
+                    transformStyle: 'preserve-3d'
+                }}
+                className={`relative flex flex-col md:flex-row w-full max-w-4xl bg-[#1a2233]/80 backdrop-blur-xl border border-white/10 rounded-2xl p-8 md:p-12 shadow-2xl transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] ${isOpen ? 'translate-y-0 scale-100 opacity-100' : 'translate-y-12 scale-95 opacity-0'}`}
+            >
+                <button onClick={onClose} className="absolute top-4 right-4 z-50 p-2 text-white/50 hover:text-white bg-white/5 hover:bg-white/10 rounded-full transition-all" style={{ transform: 'translateZ(30px)' }}>
                     <X size={24} />
                 </button>
                 <div className="absolute inset-0 bg-gradient-to-br from-[#00bfff]/5 via-transparent to-[#ff00ff]/5 pointer-events-none"></div>
                 <div className="absolute top-0 left-0 w-32 h-32 border-t-2 border-l-2 border-[#00bfff]/50 rounded-tl-2xl pointer-events-none"></div>
                 <div className="absolute bottom-0 right-0 w-32 h-32 border-b-2 border-r-2 border-[#ff00ff]/50 rounded-br-2xl pointer-events-none"></div>
                 
-                <div className="flex-shrink-0 mb-8 md:mb-0 md:mr-12 flex flex-col items-center">
+                <div className="flex-shrink-0 mb-8 md:mb-0 md:mr-12 flex flex-col items-center" style={{ transform: 'translateZ(40px)' }}>
                     <div className="relative group">
                         <div className="absolute -inset-0.5 bg-gradient-to-r from-[#00bfff] to-[#ff00ff] rounded-2xl opacity-75 blur group-hover:opacity-100 transition duration-1000 group-hover:duration-200 animate-pulse"></div>
-                        <img src="https://home.barian.moe/avatar.jpg" alt="Avatar" className="relative w-[200px] h-[200px] md:w-[280px] md:h-[280px] object-cover rounded-xl shadow-2xl border-2 border-white/10" />
+                        <img src="https://home.barian.moe/avatar.jpg" alt="Avatar" className="relative w-[200px] h-[200px] md:w-[280px] md:h-[280px] object-cover rounded-xl shadow-2xl border-2 border-white/10 pointer-events-none" />
                     </div>
                 </div>
                 
-                <div className="flex-1 text-left relative z-10">
+                <div className="flex-1 text-left relative z-10" style={{ transform: 'translateZ(30px)' }}>
                     <h1 className="text-4xl md:text-6xl font-bold text-white mb-4 tracking-wider">
                         <div className="relative inline-block group">
                             <span className="relative z-10">幽影櫻</span>
@@ -51,7 +90,7 @@ export const AuthorCard: React.FC<AuthorCardProps> = ({ onClose }) => {
                         <p className="border-l-2 border-[#ff00ff] pl-4">最近在研究 ai 相關的內容，寫一些小程序。</p>
                     </div>
                     
-                    <div className="flex gap-4 mb-8">
+                    <div className="flex gap-4 mb-8" style={{ transform: 'translateZ(10px)' }}>
                         <a href="https://www.youtube.com/@barian0517" onClick={handleLinkClick} className="p-3 bg-white/5 rounded-full border border-white/10 hover:border-[#00bfff] transition-colors shadow-[0_0_10px_transparent] hover:shadow-[0_0_15px_#00bfff]" style={{ color: "rgb(255, 0, 0)" }}>
                             <Youtube size={20} />
                         </a>

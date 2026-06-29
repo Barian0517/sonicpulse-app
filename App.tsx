@@ -297,7 +297,7 @@ const App: React.FC = () => {
 
   // UI State
   const [isUIHidden, setIsUIHidden] = useState(false);
-  const [isMusicPlayerOpen, setIsMusicPlayerOpen] = useState(false);
+  const [isMusicPlayerOpen, setIsMusicPlayerOpen] = useState(true);
   const [isGlobalMute, setIsGlobalMute] = useState(() => {
     try {
       return localStorage.getItem(STORAGE_KEY_MUTE) === 'true';

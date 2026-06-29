@@ -58,7 +58,7 @@ const Controls: React.FC<ControlsProps> = ({
   isOverlayLocked,
   hasOverlay
 }) => {
-  const [isOpen, setIsOpen] = useState(true);
+  const [isOpen, setIsOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
   const toggleBtnRef = useRef<HTMLButtonElement>(null);
   const [activeTab, setActiveTab] = useState<'audio' | 'style' | 'layout' | 'effects' | 'lyrics'>('audio');
