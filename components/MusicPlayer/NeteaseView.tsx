@@ -127,7 +127,11 @@ export const NeteaseView: React.FC<{
         
         const handleReload = (e: any) => {
             if (e.detail === 'netease') {
+                if (activeTab !== 'playlists' && isLoggedIn) {
+                    fetchPlaylists();
+                }
                 loadTab();
+                window.dispatchEvent(new CustomEvent('sonicpulse-toast', { detail: "網易雲內容已重新整理" }));
             }
         };
 

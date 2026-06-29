@@ -261,9 +261,7 @@ export const MusicPlayerLayout: React.FC<{
                     setNaviPass(pass);
                     
                     naviProvider.init(url, user, pass);
-                    const initialTracks = await naviProvider.getTracks();
                     setIsNaviReady(true);
-                    setTracks(initialTracks);
                     if (activeSource === 'local' && !savedFolder) {
                         setActiveSource('navidrome');
                     }
@@ -275,10 +273,27 @@ export const MusicPlayerLayout: React.FC<{
         loadSaved();
     }, [localProvider, naviProvider]);
 
-    // Playback state is now fully controlled by App.tsx, so we don't need local listeners.
     const { isPlaying, progress, volume } = playbackState;
 
     const [isLocalReady, setIsLocalReady] = useState(false);
+
+    useEffect(() => {
+        const handleReload = async (e: any) => {
+            if (e.detail === 'local' && isLocalReady) {
+                try {
+                    const allTracks = await localProvider.getTracks();
+                    const allAlbums = await localProvider.getTopAlbums();
+                    setTracks(allTracks);
+                    setAlbums(allAlbums);
+                    window.dispatchEvent(new CustomEvent('sonicpulse-toast', { detail: "本地音樂庫已重新整理" }));
+                } catch(e) {
+                    window.dispatchEvent(new CustomEvent('sonicpulse-toast', { detail: "重新整理失敗" }));
+                }
+            }
+        };
+        window.addEventListener('sonicpulse-reload-source', handleReload);
+        return () => window.removeEventListener('sonicpulse-reload-source', handleReload);
+    }, [isLocalReady, localProvider]);
 
     const handleSelectLocalFolder = async () => {
         try {

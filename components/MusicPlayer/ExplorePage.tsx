@@ -3,6 +3,7 @@ import { MusicProvider, Track } from '../../providers/MusicProvider';
 import { TrackList } from './TrackList';
 import { Heart, Play, Music } from 'lucide-react';
 import { useTranslation } from '../../providers/I18nProvider';
+import { TrackContextMenu } from './TrackContextMenu';
 
 export const ExplorePage: React.FC<{
     provider: MusicProvider;
@@ -15,6 +16,12 @@ export const ExplorePage: React.FC<{
     const [frequentTracks, setFrequentTracks] = useState<Track[]>([]);
     const [randomTracks, setRandomTracks] = useState<Track[]>([]);
     const [neteaseRecommendations, setNeteaseRecommendations] = useState<Track[]>([]);
+    const [isFetching, setIsFetching] = useState(false);
+    
+    // Context Menu State
+    const [menuTrack, setMenuTrack] = useState<Track | null>(null);
+    const [menuPosition, setMenuPosition] = useState<{x: number, y: number} | null>(null);
+
     const { t } = useTranslation();
 
     // Trigger re-render when liked songs update
@@ -30,6 +37,7 @@ export const ExplorePage: React.FC<{
         // But provider.getTracks() or similar methods need options for these.
         // Let's assume we can fetch random tracks for now or use the generic getTracks
         const fetchExplore = async () => {
+            setIsFetching(true);
             try {
                 if (provider.name === 'Netease Cloud Music') {
                     // Try to fetch liked songs and similar
@@ -54,9 +62,19 @@ export const ExplorePage: React.FC<{
                 setRandomTracks(shuffledRandom.slice(0, 10));
             } catch (e) {
                 console.error(e);
+            } finally {
+                setIsFetching(false);
             }
         };
         fetchExplore();
+
+        const handleReload = (e: any) => {
+            if (e.detail === 'netease' || e.detail === 'navidrome') {
+                fetchExplore();
+            }
+        };
+        window.addEventListener('sonicpulse-reload-source', handleReload);
+        return () => window.removeEventListener('sonicpulse-reload-source', handleReload);
     }, [provider]);
 
     return (
@@ -72,9 +90,13 @@ export const ExplorePage: React.FC<{
                 </div>
             </div>
 
-            {neteaseRecommendations.length > 0 && (
-                <div>
-                    <div className="flex items-center gap-4 mb-4">
+            {isFetching ? (
+                <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500"></div></div>
+            ) : (
+                <>
+                    {neteaseRecommendations.length > 0 && (
+                        <div>
+                            <div className="flex items-center gap-4 mb-4">
                         <h2 className="text-xl font-bold text-white">{t('explore.likedAndSimilar')}</h2>
                         <button 
                             onClick={() => onPlayNow && onPlayNow(neteaseRecommendations)}
@@ -90,6 +112,12 @@ export const ExplorePage: React.FC<{
                                 key={track.id + '-' + idx} 
                                 className="group flex items-center p-3 rounded-xl hover:bg-white/5 cursor-pointer transition-colors relative"
                                 onClick={() => onPlayNow && onPlayNow([track])}
+                                onContextMenu={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    setMenuTrack(track);
+                                    setMenuPosition({ x: e.clientX, y: e.clientY });
+                                }}
                             >
                                 <div className="relative w-16 h-16 rounded-lg overflow-hidden shrink-0 shadow-md">
                                     {track.coverUrl ? (
@@ -129,6 +157,17 @@ export const ExplorePage: React.FC<{
                     onAddToQueue={onAddToQueue}
                 />
             </div>
+            <TrackContextMenu 
+                track={menuTrack}
+                position={menuPosition}
+                provider={provider}
+                onClose={() => setMenuTrack(null)}
+                onPlayTrack={onPlayTrack}
+                onPlayNext={onPlayNext}
+                onAddToQueue={onAddToQueue}
+            />
+                </>
+            )}
         </div>
     );
 };
