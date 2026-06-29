@@ -1,6 +1,6 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "櫻撥放器 sakura player",
+  "productName": "SakuraPlayer",
   "version": "0.1.0",
   "identifier": "com.sonicpulse.visualizer",
   "build": {
