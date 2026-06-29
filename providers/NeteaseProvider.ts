@@ -56,8 +56,9 @@ export class NeteaseProvider implements MusicProvider {
         }
 
         const bodyParams = new URLSearchParams();
-        if (this.cookie) {
-            bodyParams.append('cookie', this.cookie);
+        const effectiveCookie = params.cookie || this.cookie;
+        if (effectiveCookie) {
+            bodyParams.append('cookie', effectiveCookie);
         }
 
         for (const [key, value] of Object.entries(params)) {

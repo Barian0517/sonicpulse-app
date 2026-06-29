@@ -229,6 +229,7 @@ export const NeteaseView: React.FC<{
                         clearInterval(interval);
                         if (res.cookie) {
                             localStorage.setItem('netease_cookie', res.cookie);
+                            provider.setCookie(res.cookie);
                             // Optionally fetch login status to get user id
                             const status = await provider.getLoginStatus(res.cookie);
                             if (status?.profile?.userId) {

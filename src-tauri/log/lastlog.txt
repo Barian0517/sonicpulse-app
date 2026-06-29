@@ -191,3 +191,7 @@
 [2026-06-29 20:46:13.269] [INFO] ⏹️ 歌曲播放完畢，準備切換下一首
 [2026-06-29 20:47:35.354] [ERROR] Uncaught Error: Uncaught ReferenceError: STORAGE_KEY_LANG is not defined at http://localhost:3000/App.tsx?t=1782737251860:367
 [2026-06-29 20:49:14.473] [ERROR] Uncaught Error: Uncaught ReferenceError: STORAGE_KEY_LANG is not defined at http://localhost:3000/App.tsx?t=1782737350900:357
+[2026-06-29 21:32:12.240] [INFO] ▶️ 準備播放歌曲: 别来无恙，故乡 by 周思伽
+[2026-06-29 21:32:13.096] [INFO] 🎵 正在播放: 别来无恙，故乡 by 周思伽
+[2026-06-29 21:32:22.341] [INFO] ▶️ 準備播放歌曲: 别来无恙，故乡
+[2026-06-29 21:32:22.871] [INFO] 🎵 正在播放: 别来无恙，故乡
