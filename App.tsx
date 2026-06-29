@@ -275,6 +275,7 @@ const App: React.FC = () => {
   const [toastMessage, setToastMessage] = useState('');
   const [toastVisible, setToastVisible] = useState(false);
   const toastTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const errorSkipTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const showToast = (message: string) => {
     setToastMessage(message);
@@ -707,6 +708,11 @@ const App: React.FC = () => {
   };
 
   const playTrack = (track: { name: string, url: string, file?: File | null, track?: any }) => {
+    if (errorSkipTimeoutRef.current) {
+        clearTimeout(errorSkipTimeoutRef.current);
+        errorSkipTimeoutRef.current = null;
+    }
+
     // Determine the next player for gapless swap
     const nextPlayerKey = activePlayerRef.current === 'audio1' ? 'audio2' : 'audio1';
     const nextPlayer = nextPlayerKey === 'audio1' ? audio1Ref.current : audio2Ref.current;
@@ -719,7 +725,10 @@ const App: React.FC = () => {
     // Load and play the new track on the inactive player
     nextPlayer.src = track.url;
     nextPlayer.load();
-    nextPlayer.play().catch(console.error);
+    nextPlayer.play().catch(e => {
+        console.error("Play failed:", e);
+        window.dispatchEvent(new CustomEvent('sonicpulse-track-error'));
+    });
 
     // Fade out / Pause the previous player (Gapless transition)
     if (currentPlayer && !currentPlayer.paused) {
@@ -761,7 +770,23 @@ const App: React.FC = () => {
                     const provider = new NeteaseProvider();
                     const similar = await provider.getSimilarSongs(lastTrack.id);
                     if (similar && similar.length > 0) {
-                        const newTracks = similar.map(s => ({
+                        const existingIds = new Set(roamPlaylist.map(t => t.track?.id));
+                        let newSimilar = similar.filter(s => !existingIds.has(s.id));
+                        
+                        if (newSimilar.length === 0) {
+                            try {
+                                const fallbackTracks = await provider.getTracks();
+                                newSimilar = fallbackTracks.filter(s => !existingIds.has(s.id)).slice(0, 5);
+                            } catch (e) {}
+                            
+                            if (newSimilar.length === 0) {
+                                setIsRoamingMode(false);
+                                showToast("漫遊已結束：沒有更多推薦歌曲");
+                                return;
+                            }
+                        }
+
+                        const newTracks = newSimilar.map(s => ({
                             name: s.title + (s.artist ? ` by ${s.artist}` : ''),
                             url: '',
                             file: null,
@@ -1109,9 +1134,7 @@ const App: React.FC = () => {
         if (e.target === getActivePlayer()) setDuration(e.target.duration);
     };
 
-    const onEnded = (e: any) => {
-      if (e.target !== getActivePlayer()) return;
-      
+    const skipToNext = () => {
       if (isRoamingMode && roamPlaylist.length > 0) {
         handleNextTrack();
       } else if (isExternalQueue) {
@@ -1121,11 +1144,36 @@ const App: React.FC = () => {
       } else {
         setAudioState(prev => ({ ...prev, isPlaying: false }));
       }
+    };
+
+    const onEnded = (e: any) => {
+      if (e.target !== getActivePlayer()) return;
+      skipToNext();
       
       // Auto stop recording if in auto-render mode
       if (isAutoRender && mediaRecorderRef.current?.state === 'recording') {
         handleStopRecording();
       }
+    };
+
+    const onError = (e: any) => {
+      if (e.target && e.target !== getActivePlayer()) return;
+      console.error("Audio playback error:", e.target?.error || e);
+      if (errorSkipTimeoutRef.current) return;
+      showToast("歌曲播放失敗，將自動跳過");
+      errorSkipTimeoutRef.current = setTimeout(() => {
+          errorSkipTimeoutRef.current = null;
+          skipToNext();
+      }, 1500);
+    };
+
+    const onCustomError = () => {
+      if (errorSkipTimeoutRef.current) return;
+      showToast("歌曲播放失敗，將自動跳過");
+      errorSkipTimeoutRef.current = setTimeout(() => {
+          errorSkipTimeoutRef.current = null;
+          skipToNext();
+      }, 1500);
     };
 
     const onPlay = (e: any) => {
@@ -1140,9 +1188,11 @@ const App: React.FC = () => {
         el.addEventListener('timeupdate', onTimeUpdate);
         el.addEventListener('durationchange', onDurationChange);
         el.addEventListener('ended', onEnded);
+        el.addEventListener('error', onError);
         el.addEventListener('play', onPlay);
         el.addEventListener('pause', onPause);
     });
+    window.addEventListener('sonicpulse-track-error', onCustomError);
 
     return () => {
       players.forEach(el => {
@@ -1150,9 +1200,11 @@ const App: React.FC = () => {
           el.removeEventListener('timeupdate', onTimeUpdate);
           el.removeEventListener('durationchange', onDurationChange);
           el.removeEventListener('ended', onEnded);
+          el.removeEventListener('error', onError);
           el.removeEventListener('play', onPlay);
           el.removeEventListener('pause', onPause);
       });
+      window.removeEventListener('sonicpulse-track-error', onCustomError);
     };
   }, [isAutoRender, mainPlaylist, isRoamingMode, roamPlaylist, mainTrackIndex, roamTrackIndex, isExternalQueue]);
 
