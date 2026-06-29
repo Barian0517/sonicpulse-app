@@ -36,7 +36,7 @@ process.on('uncaughtException', (err) => {
     console.error('Uncaught Exception from a plugin:', err instanceof Error ? err.message : err);
 });
 
-const configPath = path.join(__dirname, 'musicfree-config.json');
+const configPath = path.join(process.cwd(), 'musicfree-config.json');
 
 function getConfig() {
     if (fs.existsSync(configPath)) {
@@ -45,7 +45,7 @@ function getConfig() {
         } catch (e) {}
     }
     return { 
-        pluginDir: path.join(__dirname, 'musicfree-plugin'),
+        pluginDir: path.join(process.cwd(), 'musicfree-plugin'),
         variables: {} // { "pluginId": { "music_u": "...", "source": "..." } }
     };
 }
@@ -332,7 +332,7 @@ let hostSocket = null;
 let lastHostState = null;
 
 // Serve the Jukebox frontend files
-app.use('/jukebox', express.static(path.join(__dirname, 'dist-jukebox')));
+app.use('/jukebox', express.static(path.join(process.cwd(), 'dist-jukebox')));
 
 // Configure Jukebox API (called by Tauri Host)
 app.post('/jukebox/configure', (req, res) => {
@@ -394,7 +394,7 @@ app.post('/jukebox/configure', (req, res) => {
             }
         });
 
-        const distPath = path.join(__dirname, 'dist');
+        const distPath = path.join(process.cwd(), 'dist');
         jukeboxApp.use(express.static(distPath));
         
         jukeboxApp.use((req, res) => {

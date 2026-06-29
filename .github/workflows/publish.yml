@@ -47,6 +47,19 @@ jobs:
       - name: install frontend dependencies
         run: npm install
 
+      - name: compile backend sidecar
+        shell: bash
+        run: |
+          mkdir -p src-tauri/binaries
+          if [ "${{ matrix.platform }}" == "windows-latest" ]; then
+            npx pkg backend-server.cjs -t node18-win-x64 -o src-tauri/binaries/backend-x86_64-pc-windows-msvc.exe
+          elif [ "${{ matrix.platform }}" == "ubuntu-22.04" ]; then
+            npx pkg backend-server.cjs -t node18-linux-x64 -o src-tauri/binaries/backend-x86_64-unknown-linux-gnu
+          elif [ "${{ matrix.platform }}" == "macos-latest" ]; then
+            npx pkg backend-server.cjs -t node18-macos-x64 -o src-tauri/binaries/backend-x86_64-apple-darwin
+            npx pkg backend-server.cjs -t node18-macos-arm64 -o src-tauri/binaries/backend-aarch64-apple-darwin
+          fi
+
       - name: auto-increment version
         shell: bash
         run: |

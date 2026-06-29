@@ -343,11 +343,7 @@ const App: React.FC = () => {
   // UI State
   const [isUIHidden, setIsUIHidden] = useState(false);
   const [isMusicPlayerOpen, setIsMusicPlayerOpen] = useState(true);
-  const [isGlobalMute, setIsGlobalMute] = useState(() => {
-    try {
-      return localStorage.getItem(STORAGE_KEY_MUTE) === 'true';
-    } catch (e) { return false; }
-  });
+  const [isGlobalMute, setIsGlobalMute] = useState(false);
 
   // Overlay State
   const [hasOverlay, setHasOverlay] = useState(false);
@@ -388,10 +384,7 @@ const App: React.FC = () => {
     localStorage.setItem(STORAGE_KEY_LANG, language);
   }, [language]);
 
-  // Persist Mute status
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY_MUTE, isGlobalMute.toString());
-  }, [isGlobalMute]);
+  // Removed Mute persistence so it always defaults to false on startup
 
   // Persist Volume and Monitor settings
   useEffect(() => {

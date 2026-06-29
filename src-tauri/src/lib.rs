@@ -90,6 +90,29 @@ pub fn run() {
         .setup(|app| {
             app.handle().plugin(tauri_plugin_dialog::init())?;
             app.handle().plugin(tauri_plugin_http::init())?;
+            
+            use tauri_plugin_shell::ShellExt;
+            match app.handle().shell().sidecar("backend") {
+                Ok(command) => {
+                    match command.spawn() {
+                        Ok((mut rx, _child)) => {
+                            tauri::async_runtime::spawn(async move {
+                                while let Some(_event) = rx.recv().await {
+                                    // Keep rx alive
+                                }
+                            });
+                            println!("Backend sidecar started successfully.");
+                        }
+                        Err(e) => {
+                            eprintln!("Failed to spawn backend sidecar: {}", e);
+                        }
+                    }
+                }
+                Err(e) => {
+                    eprintln!("Failed to find backend sidecar: {}", e);
+                }
+            }
+            
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
