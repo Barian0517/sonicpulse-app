@@ -101,6 +101,7 @@
     "randomDiscovery": "Random Discovery"
   },
   "netease": {
+    "searchPlaceholder": "Search Netease...",
     "browse": "Browse",
     "dailyRecommendation": "Daily Recommendation",
     "myMusicLibrary": "My Music Library",

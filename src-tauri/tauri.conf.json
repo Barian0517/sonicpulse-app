@@ -1,6 +1,6 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "sonicpulse-visualizer",
+  "productName": "櫻撥放器 sakura player",
   "version": "0.1.0",
   "identifier": "com.sonicpulse.visualizer",
   "build": {
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "SonicPulse Visualizer",
+        "title": "櫻撥放器 sakura player",
         "width": 800,
         "height": 600,
         "resizable": true,

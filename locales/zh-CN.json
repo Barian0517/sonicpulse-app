@@ -101,6 +101,7 @@
     "randomDiscovery": "随机漫游"
   },
   "netease": {
+    "searchPlaceholder": "搜索网易云音乐...",
     "browse": "浏览",
     "dailyRecommendation": "每日推荐",
     "myMusicLibrary": "我的音乐库",

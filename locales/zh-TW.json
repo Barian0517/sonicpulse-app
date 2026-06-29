@@ -131,6 +131,7 @@
     "randomDiscovery": "隨機漫遊"
   },
   "netease": {
+    "searchPlaceholder": "搜尋網易雲音樂...",
     "browse": "瀏覽",
     "dailyRecommendation": "每日推薦",
     "myMusicLibrary": "我的音樂庫",

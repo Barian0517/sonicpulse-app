@@ -3,7 +3,7 @@ export type Language = 'en' | 'zh' | 'ja';
 
 export const translations = {
   en: {
-    appTitle: "SonicPulse by 幽影櫻",
+    appTitle: "櫻撥放器 sakura player",
     tabs: { audio: "Audio", style: "Shape", layout: "Visualizer", image: "Image", effects: "Basic", lyrics: "Lyrics" },
     audio: {
       inputSource: "INPUT SOURCE",
@@ -151,7 +151,7 @@ export const translations = {
     overlay: "Select Audio Source to Begin"
   },
   zh: {
-    appTitle: "SonicPulse 音頻律動 by 幽影櫻",
+    appTitle: "櫻撥放器 sakura player",
     tabs: { audio: "音訊", style: "外型", layout: "視覺化設定", image: "圖片", effects: "基礎", lyrics: "字幕" },
     audio: {
       inputSource: "輸入來源",
@@ -299,7 +299,7 @@ export const translations = {
     overlay: "請選擇音訊來源以開始"
   },
   ja: {
-    appTitle: "SonicPulse オーディオビジュアライザ by 幽影櫻",
+    appTitle: "櫻撥放器 sakura player",
     tabs: { audio: "オーディオ", style: "形状", layout: "ビジュアライザ", image: "画像", effects: "基本", lyrics: "歌詞" },
     audio: {
       inputSource: "入力ソース",

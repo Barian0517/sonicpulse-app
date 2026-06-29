@@ -101,6 +101,7 @@
     "randomDiscovery": "ランダムディスカバリー"
   },
   "netease": {
+    "searchPlaceholder": "Neteaseを検索...",
     "browse": "ブラウズ",
     "dailyRecommendation": "デイリーおすすめ",
     "myMusicLibrary": "マイライブラリ",

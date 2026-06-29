@@ -203,7 +203,7 @@ export const JukeboxApp: React.FC = () => {
         return (
             <div className="h-screen bg-[#0a0a0f] text-white flex flex-col items-center justify-center font-sans">
                 <Loader2 size={48} className="animate-spin text-purple-500 mb-6" />
-                <h1 className="text-2xl font-bold mb-2">Connecting to SonicPulse Host...</h1>
+                <h1 className="text-2xl font-bold mb-2">Connecting to 櫻撥放器 sakura player Host...</h1>
                 <p className="text-gray-400">Please make sure the host is running and you are on the same network.</p>
             </div>
         );
@@ -284,7 +284,7 @@ export const JukeboxApp: React.FC = () => {
                         <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center shadow-lg shadow-purple-500/20 shrink-0">
                             <Play fill="white" size={16} className="ml-1" />
                         </div>
-                        <span className="ml-3 font-bold text-lg tracking-wide bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400">SonicPulse</span>
+                        <span className="ml-3 font-bold text-lg tracking-wide bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400">櫻撥放器 sakura player</span>
                     </div>
                     {/* Mobile Settings Button */}
                     <button onClick={() => setIsSettingsOpen(true)} className="md:hidden text-gray-400 hover:text-white p-2">
