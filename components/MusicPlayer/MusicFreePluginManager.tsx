@@ -68,10 +68,14 @@ export const MusicFreePluginManager: React.FC<{ provider: any }> = ({ provider }
         if (!installUrl.trim()) return;
         setIsInstalling(true);
         try {
-            await provider.installNetworkPlugin(installUrl.trim());
+            const res = await provider.installNetworkPlugin(installUrl.trim());
             setInstallUrl('');
             await loadPlugins();
-            window.dispatchEvent(new CustomEvent('sonicpulse-toast', { detail: '安裝成功' }));
+            if (res.installed && res.installed.length > 1) {
+                window.dispatchEvent(new CustomEvent('sonicpulse-toast', { detail: `成功安裝 ${res.installed.length} 個插件` }));
+            } else {
+                window.dispatchEvent(new CustomEvent('sonicpulse-toast', { detail: '安裝成功' }));
+            }
             window.dispatchEvent(new CustomEvent('sonicpulse-reload-source', { detail: 'musicfree' }));
         } catch (e: any) {
             window.dispatchEvent(new CustomEvent('sonicpulse-toast', { detail: `安裝失敗: ${e.message}` }));

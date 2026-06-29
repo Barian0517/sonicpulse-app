@@ -9,6 +9,14 @@ const http = require('http');
 const { Server } = require('socket.io');
 const os = require('os');
 
+// Static requires to ensure `pkg` bundles these dependencies for plugins
+require('cheerio');
+require('dayjs');
+require('he');
+require('big-integer');
+require('webdav');
+require('crypto-js');
+
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -202,24 +210,56 @@ app.post('/plugin/install/url', async (req, res) => {
     const { url } = req.body;
     try {
         const response = await axios.get(url);
-        const code = response.data;
-        if (typeof code !== 'string') throw new Error("Invalid plugin code format");
+        let pluginsToInstall = [];
         
+        if (typeof response.data === 'object' && response.data.plugins && Array.isArray(response.data.plugins)) {
+            // JSON Subscription format
+            pluginsToInstall = response.data.plugins.map(p => p.url).filter(Boolean);
+        } else if (typeof response.data === 'string') {
+            // Direct JS file format
+            pluginsToInstall = [url];
+        } else {
+            throw new Error("Invalid plugin format or unsupported subscription JSON");
+        }
+
         const cfg = getConfig();
         if (!fs.existsSync(cfg.pluginDir)) fs.mkdirSync(cfg.pluginDir, { recursive: true });
-        
-        // Use hash for filename if not provided
-        const filename = crypto.createHash('md5').update(url).digest('hex').substring(0, 8) + '.js';
-        const dest = path.join(cfg.pluginDir, filename);
-        
-        fs.writeFileSync(dest, code, 'utf8');
-        const plugin = loadPlugin(dest);
-        if (plugin && plugin.platform) {
-            plugins[filename] = plugin;
-            res.json({ success: true, id: filename });
+
+        const results = { success: [], failed: [] };
+
+        for (const targetUrl of pluginsToInstall) {
+            try {
+                let codeToInstall;
+                if (targetUrl === url && typeof response.data === 'string') {
+                    codeToInstall = response.data;
+                } else {
+                    const dlRes = await axios.get(targetUrl);
+                    if (typeof dlRes.data !== 'string') throw new Error("Downloaded content is not string");
+                    codeToInstall = dlRes.data;
+                }
+
+                const filename = crypto.createHash('md5').update(targetUrl).digest('hex').substring(0, 8) + '.js';
+                const dest = path.join(cfg.pluginDir, filename);
+                
+                fs.writeFileSync(dest, codeToInstall, 'utf8');
+                const plugin = loadPlugin(dest);
+                
+                if (plugin && plugin.platform) {
+                    plugins[filename] = plugin;
+                    results.success.push({ name: plugin.platform || 'Unknown', id: filename });
+                } else {
+                    fs.unlinkSync(dest);
+                    throw new Error("Invalid plugin");
+                }
+            } catch (err) {
+                results.failed.push({ url: targetUrl, error: err.message });
+            }
+        }
+
+        if (results.success.length > 0) {
+            res.json({ success: true, installed: results.success, failed: results.failed });
         } else {
-            fs.unlinkSync(dest); // Rollback
-            res.status(400).json({ error: 'Installed file is not a valid plugin' });
+            res.status(400).json({ error: 'Failed to install any plugins', details: results.failed });
         }
     } catch(e) {
         res.status(500).json({ error: e.message || String(e) });
