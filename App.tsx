@@ -226,11 +226,6 @@ const App: React.FC = () => {
   const [roamTrackIndex, setRoamTrackIndex] = useState(-1);
   const [isRoamingMode, setIsRoamingMode] = useState(false);
 
-  useEffect(() => {
-    const handleToggleRoaming = () => setIsRoamingMode(prev => !prev);
-    window.addEventListener('sonicpulse-toggle-roaming', handleToggleRoaming);
-    return () => window.removeEventListener('sonicpulse-toggle-roaming', handleToggleRoaming);
-  }, []);
 
   const playlist = isRoamingMode ? roamPlaylist : mainPlaylist;
   const currentTrackIndex = isRoamingMode ? roamTrackIndex : mainTrackIndex;
@@ -774,7 +769,15 @@ const App: React.FC = () => {
                         }));
                         setRoamPlaylist(prev => [...prev, ...newTracks]);
                         setRoamTrackIndex(nextIndex);
-                        playTrack(newTracks[0]);
+                        
+                        let url = newTracks[0].track?.streamUrl || '';
+                        if (!url && newTracks[0].track?.source === 'netease') {
+                            try {
+                                url = await provider.getStreamUrl(newTracks[0].track.id);
+                            } catch (e) {}
+                        }
+                        
+                        playTrack({ ...newTracks[0], url });
                         return;
                     }
                 } catch (e) {
@@ -867,6 +870,53 @@ const App: React.FC = () => {
     setMainTrackIndex(index);
     playTrack(mainPlaylist[index]);
   };
+
+  const handleStartRoaming = async (track: any) => {
+      if (!track || track.source !== 'netease') {
+          showToast("漫遊功能目前僅支援網易雲音樂的歌曲哦！");
+          return;
+      }
+      try {
+          const provider = new NeteaseProvider();
+          const similar = await provider.getSimilarSongs(track.id);
+          const newRoam = [
+              { name: track.title, url: '', file: null, track },
+              ...similar.map(s => ({ name: s.title, url: '', file: null, track: s }))
+          ];
+          setRoamPlaylist(newRoam);
+          setRoamTrackIndex(0);
+          setIsRoamingMode(true);
+          
+          let url = track.streamUrl || '';
+          if (!url && track.source === 'netease') {
+              url = await provider.getStreamUrl(track.id);
+          }
+          playTrack({ name: track.title, url, file: null, track });
+          showToast("已為您開啟相似歌曲漫遊");
+      } catch(e) {
+          console.error("Failed to start roaming", e);
+          showToast("開啟漫遊失敗，請稍後再試");
+      }
+  };
+
+  useEffect(() => {
+    const handleToggleRoaming = (e: any) => {
+        if (isRoamingMode) {
+            setIsRoamingMode(false);
+            setRoamPlaylist([]);
+            showToast("已關閉漫遊模式");
+        } else {
+            if (e && e.detail && e.detail.source) {
+                handleStartRoaming(e.detail);
+            } else {
+                // Fallback, shouldn't happen unless triggered without track
+                setIsRoamingMode(true);
+            }
+        }
+    };
+    window.addEventListener('sonicpulse-toggle-roaming', handleToggleRoaming);
+    return () => window.removeEventListener('sonicpulse-toggle-roaming', handleToggleRoaming);
+  }, [isRoamingMode, handleStartRoaming]);
 
   const handleOutputDeviceChange = async (deviceId: string) => {
     if (!audioContextRef.current) return;
@@ -1062,10 +1112,11 @@ const App: React.FC = () => {
     const onEnded = (e: any) => {
       if (e.target !== getActivePlayer()) return;
       
-      // If we are playing from MusicPlayerLayout's queue, we should notify it.
-      if (isExternalQueue) {
+      if (isRoamingMode && roamPlaylist.length > 0) {
+        handleNextTrack();
+      } else if (isExternalQueue) {
         window.dispatchEvent(new CustomEvent('sonicpulse-track-ended'));
-      } else if (mainPlaylist.length > 1 || (isRoamingMode && roamPlaylist.length > 0)) {
+      } else if (mainPlaylist.length > 1) {
         handleNextTrack();
       } else {
         setAudioState(prev => ({ ...prev, isPlaying: false }));
@@ -1103,7 +1154,7 @@ const App: React.FC = () => {
           el.removeEventListener('pause', onPause);
       });
     };
-  }, [isAutoRender, mainPlaylist, isRoamingMode, roamPlaylist]);
+  }, [isAutoRender, mainPlaylist, isRoamingMode, roamPlaylist, mainTrackIndex, roamTrackIndex, isExternalQueue]);
 
   // Overlay Window internal state
   const [isThisOverlayLocked, setIsThisOverlayLocked] = useState(() => {

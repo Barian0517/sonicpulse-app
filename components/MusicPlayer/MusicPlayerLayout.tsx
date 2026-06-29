@@ -511,7 +511,9 @@ export const MusicPlayerLayout: React.FC<{
         queue,
         playTrackUrl,
         currentTrack,
-        handleToggleLike
+        handleToggleLike,
+        playTrack: undefined as any,
+        playNow: undefined as any
     });
 
     useEffect(() => {
@@ -647,7 +649,8 @@ export const MusicPlayerLayout: React.FC<{
                             s.playTrackUrl(s.queue[cmd.index]);
                         }
                     } else if (cmd.type === 'toggle_roaming') {
-                        window.dispatchEvent(new CustomEvent('sonicpulse-toggle-roaming'));
+                        const current = s.queue[s.queueIndex];
+                        window.dispatchEvent(new CustomEvent('sonicpulse-toggle-roaming', { detail: current }));
                     } else if (cmd.type === 'get_personal_data' && s.jukeboxPersonalMode) {
                         let naviUrl = localStorage.getItem('navidrome_url') || '';
                         let naviUser = localStorage.getItem('navidrome_user') || '';
