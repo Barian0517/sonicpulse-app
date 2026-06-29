@@ -26,17 +26,17 @@ const DEFAULT_CONFIG: VisualizerConfig = {
   material: VisualizerMaterial.Standard,
   barCount: 128,
   barWidth: 4,
-  barLengthScale: 1.5,
+  barLengthScale: 1,
   symmetry: SymmetryMode.CenterOut,
-  startAngle: 270, // Top
-  radius: 150,
+  startAngle: 270,
+  radius: 121,
   linearGap: 2,
-  centerX: 50,
-  centerY: 50,
+  centerX: 71,
+  centerY: 48,
   shakeFactor: 10,
   colorMode: 'dual',
-  colorStart: '#00ffff',
-  colorEnd: '#ff00ff',
+  colorStart: '#ff0000',
+  colorEnd: '#3224ff',
   smoothing: 0.85,
   backgroundMode: 'image',
   backgroundColor: '#0a0a0a',
@@ -50,7 +50,7 @@ const DEFAULT_CONFIG: VisualizerConfig = {
   bgPositionY: 50,
   bgRotation: 0,
 
-  particleEffect: VisualizerParticleEffect.None,
+  particleEffect: VisualizerParticleEffect.Sakura,
   particleCount: 150,
   particleSpeed: 1,
   particleSize: 1,
@@ -69,7 +69,7 @@ const DEFAULT_CONFIG: VisualizerConfig = {
   lyricsEnabled: false,
   lyricsBlurEnabled: true,
   lyricsBgBlurEnabled: true,
-  lyricsGlowEnabled: false, // User screenshots look relatively clean, disable heavy glow by default
+  lyricsGlowEnabled: false,
   lyricsStrokeEnabled: true,
   lyricsBgEnabled: true,
   lyricsArcEnabled: true,
@@ -98,8 +98,8 @@ const DEFAULT_CONFIG: VisualizerConfig = {
   lyricsAnimEnter: 'fade',
   lyricsAnimExit: 'fade',
   lyricsAnimLoop: 'none',
-
-  performanceMode: false,
+  
+  performanceMode: false
 };
 
 const STORAGE_KEY_CONFIG = 'sonicpulse_config';
