@@ -180,3 +180,14 @@
 [2026-06-29 18:16:06.793] [INFO] 🎵 正在播放: 上瘾 by 里里
 [2026-06-29 20:10:08.937] [INFO] ▶️ 準備播放歌曲: Phantom Scope by [Unknown Artist]
 [2026-06-29 20:10:09.444] [INFO] 🎵 正在播放: Phantom Scope by [Unknown Artist]
+[2026-06-29 20:37:07.024] [INFO] ▶️ 準備播放歌曲: 灰色系 by 梶
+[2026-06-29 20:37:08.046] [INFO] 🎵 正在播放: 灰色系 by 梶
+[2026-06-29 20:39:33.425] [INFO] ⏹️ 歌曲播放完畢，準備切換下一首
+[2026-06-29 20:39:33.844] [INFO] ▶️ 準備播放歌曲: 四下无人 by 里里
+[2026-06-29 20:39:34.490] [INFO] 🎵 正在播放: 四下无人 by 里里
+[2026-06-29 20:42:13.827] [INFO] ⏹️ 歌曲播放完畢，準備切換下一首
+[2026-06-29 20:42:14.253] [INFO] ▶️ 準備播放歌曲: 别来无恙，故乡 by 周思伽
+[2026-06-29 20:42:14.874] [INFO] 🎵 正在播放: 别来无恙，故乡 by 周思伽
+[2026-06-29 20:46:13.269] [INFO] ⏹️ 歌曲播放完畢，準備切換下一首
+[2026-06-29 20:47:35.354] [ERROR] Uncaught Error: Uncaught ReferenceError: STORAGE_KEY_LANG is not defined at http://localhost:3000/App.tsx?t=1782737251860:367
+[2026-06-29 20:49:14.473] [ERROR] Uncaught Error: Uncaught ReferenceError: STORAGE_KEY_LANG is not defined at http://localhost:3000/App.tsx?t=1782737350900:357
