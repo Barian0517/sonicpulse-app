@@ -203,29 +203,74 @@ const App: React.FC = () => {
       });
   };
 
-  const [audioState, setAudioState] = useState<AudioSourceState>({
-    isPlaying: false,
-    mode: 'file',
-    monitorAudio: (() => {
-      try {
-        return localStorage.getItem(STORAGE_KEY_MONITOR) === 'true';
-      } catch (e) { return false; }
-    })(),
-    volume: (() => {
-      try {
-        const saved = localStorage.getItem(STORAGE_KEY_VOLUME);
-        return saved !== null ? parseFloat(saved) : 0.7;
-      } catch (e) { return 0.7; }
-    })()
+  const [audioState, setAudioState] = useState<AudioSourceState>(() => {
+    let initialFileName = '';
+    try {
+        const isRoaming = localStorage.getItem('sonicpulse_is_roaming') === 'true';
+        const plKey = isRoaming ? 'sonicpulse_roam_playlist' : 'sonicpulse_main_playlist';
+        const idxKey = isRoaming ? 'sonicpulse_roam_index' : 'sonicpulse_main_index';
+        const savedPl = localStorage.getItem(plKey);
+        const savedIdx = localStorage.getItem(idxKey);
+        if (savedPl && savedIdx) {
+            const list = JSON.parse(savedPl);
+            const idx = parseInt(savedIdx);
+            if (list[idx]) {
+                initialFileName = list[idx].name || list[idx].track?.title || '';
+            }
+        }
+    } catch(e) {}
+
+    return {
+      isPlaying: false,
+      mode: 'file',
+      fileName: initialFileName,
+      monitorAudio: (() => {
+        try {
+          return localStorage.getItem(STORAGE_KEY_MONITOR) === 'true';
+        } catch (e) { return false; }
+      })(),
+      volume: (() => {
+        try {
+          const saved = localStorage.getItem(STORAGE_KEY_VOLUME);
+          return saved !== null ? parseFloat(saved) : 0.7;
+        } catch (e) { return 0.7; }
+      })()
+    };
   });
 
   // Player State
-  const [mainPlaylist, setMainPlaylist] = useState<{ name: string, url: string, file: File | null, track?: Track }[]>([]);
-  const [mainTrackIndex, setMainTrackIndex] = useState(-1);
+  const [mainPlaylist, setMainPlaylist] = useState<{ name: string, url: string, file: File | null, track?: Track }[]>(() => {
+      try { return JSON.parse(localStorage.getItem('sonicpulse_main_playlist') || '[]'); } catch(e) { return []; }
+  });
+  const [mainTrackIndex, setMainTrackIndex] = useState(() => {
+      try { const v = localStorage.getItem('sonicpulse_main_index'); return v ? parseInt(v) : -1; } catch(e) { return -1; }
+  });
   
-  const [roamPlaylist, setRoamPlaylist] = useState<{ name: string, url: string, file: File | null, track?: Track }[]>([]);
-  const [roamTrackIndex, setRoamTrackIndex] = useState(-1);
-  const [isRoamingMode, setIsRoamingMode] = useState(false);
+  const [roamPlaylist, setRoamPlaylist] = useState<{ name: string, url: string, file: File | null, track?: Track }[]>(() => {
+      try { return JSON.parse(localStorage.getItem('sonicpulse_roam_playlist') || '[]'); } catch(e) { return []; }
+  });
+  const [roamTrackIndex, setRoamTrackIndex] = useState(() => {
+      try { const v = localStorage.getItem('sonicpulse_roam_index'); return v ? parseInt(v) : -1; } catch(e) { return -1; }
+  });
+  const [isRoamingMode, setIsRoamingMode] = useState(() => {
+      try { return localStorage.getItem('sonicpulse_is_roaming') === 'true'; } catch(e) { return false; }
+  });
+
+  useEffect(() => {
+      localStorage.setItem('sonicpulse_main_playlist', JSON.stringify(mainPlaylist.map(t => ({...t, file: null}))));
+  }, [mainPlaylist]);
+  useEffect(() => {
+      localStorage.setItem('sonicpulse_main_index', mainTrackIndex.toString());
+  }, [mainTrackIndex]);
+  useEffect(() => {
+      localStorage.setItem('sonicpulse_roam_playlist', JSON.stringify(roamPlaylist.map(t => ({...t, file: null}))));
+  }, [roamPlaylist]);
+  useEffect(() => {
+      localStorage.setItem('sonicpulse_roam_index', roamTrackIndex.toString());
+  }, [roamTrackIndex]);
+  useEffect(() => {
+      localStorage.setItem('sonicpulse_is_roaming', isRoamingMode.toString());
+  }, [isRoamingMode]);
 
 
   const playlist = isRoamingMode ? roamPlaylist : mainPlaylist;
@@ -1094,6 +1139,10 @@ const App: React.FC = () => {
     const player = getActivePlayer();
     if (player) {
       if (player.paused) {
+        if (!player.src || player.src === window.location.href) {
+            handleSelectTrack(isRoamingMode ? roamTrackIndex : mainTrackIndex);
+            return;
+        }
         player.play();
         setAudioState(prev => ({ ...prev, isPlaying: true }));
       } else {
