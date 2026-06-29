@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Settings, Settings2, Music2, Disc, PlaySquare, Search, Library, FolderOpen, Play, Pause, SkipBack, SkipForward, Server, ChevronLeft, Heart, RefreshCw, Plug } from 'lucide-react';
+import { Settings, Settings2, Music2, Disc, PlaySquare, Search, Library, FolderOpen, Play, Pause, SkipBack, SkipForward, Server, ChevronLeft, Heart, RefreshCw, Plug, Terminal } from 'lucide-react';
 import { open } from '@tauri-apps/plugin-dialog';
 import { convertFileSrc } from '@tauri-apps/api/core';
 import { LocalProvider } from '../../providers/LocalProvider';
@@ -10,6 +10,7 @@ import { Track, Album } from '../../providers/MusicProvider';
 import { NavidromeView } from './NavidromeView';
 import { NeteaseView } from './NeteaseView';
 import { MusicFreeView } from './MusicFreeView';
+import { LogViewer } from '../LogViewer';
 import { useTranslation, Language } from '../../providers/I18nProvider';
 import { io, Socket } from 'socket.io-client';
 import QRCode from 'react-qr-code';
@@ -37,7 +38,7 @@ export const MusicPlayerLayout: React.FC<{
     const [isSearching, setIsSearching] = useState(false);
     
     // Settings Tab State
-    const [activeSettingsTab, setActiveSettingsTab] = useState<'basic' | 'storage' | 'server' | 'jukebox' | 'preferences'>('basic');
+    const [activeSettingsTab, setActiveSettingsTab] = useState<'basic' | 'storage' | 'server' | 'jukebox' | 'preferences' | 'debug'>('basic');
     
     // Preferences State
     type PlayBehavior = 'replace' | 'insert' | 'insert_next' | 'insert_last';
@@ -1040,9 +1041,15 @@ export const MusicPlayerLayout: React.FC<{
                                     >
                                         <Plug size={18} /> {t('settings.tabs.jukebox') || '線上點歌'}
                                     </button>
+                                    <button 
+                                        onClick={() => setActiveSettingsTab('debug')}
+                                        className={`flex items-center gap-3 px-4 py-3 rounded-xl font-bold text-sm transition-all mt-auto ${activeSettingsTab === 'debug' ? 'bg-gray-600/20 text-gray-300 border border-gray-500/30 shadow-[0_0_15px_rgba(156,163,175,0.1)]' : 'text-gray-500 hover:text-gray-300 hover:bg-white/5 border border-transparent'}`}
+                                    >
+                                        <Terminal size={18} /> 系統日誌
+                                    </button>
                                 </div>
                                 {/* Settings Content */}
-                                <div className="flex-1 p-8 overflow-y-auto custom-scrollbar relative">
+                                <div className="flex-1 p-8 overflow-y-auto custom-scrollbar relative flex flex-col">
                                     {/* Decorative glow */}
                                     <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-[100px] -z-10 pointer-events-none" />
                                     
@@ -1303,6 +1310,12 @@ export const MusicPlayerLayout: React.FC<{
                                                     </div>
                                                 </div>
                                             </div>
+                                        </div>
+                                    )}
+
+                                    {activeSettingsTab === 'debug' && (
+                                        <div className="flex-1 flex flex-col h-full animate-in fade-in slide-in-from-bottom-4 duration-500 min-h-[400px]">
+                                            <LogViewer />
                                         </div>
                                     )}
                                 </div>

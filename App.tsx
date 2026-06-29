@@ -8,6 +8,7 @@ import { LyricsOverlay } from './components/LyricsOverlay';
 import { MusicPlayerLayout } from './components/MusicPlayer/MusicPlayerLayout';
 import { NeteaseProvider } from './providers/NeteaseProvider';
 import { MusicFreeProvider } from './providers/MusicFreeProvider';
+import { AppLogger } from './utils/Logger';
 import { LocalProvider } from './providers/LocalProvider';
 import { NavidromeProvider } from './providers/NavidromeProvider';
 import { VisualizerConfig, VisualizerShape, VisualizerDirection, VisualizerStyle, SymmetryMode, AudioSourceState, VisualizerMaterial, VisualizerParticleEffect } from './types';
@@ -713,6 +714,8 @@ const App: React.FC = () => {
         errorSkipTimeoutRef.current = null;
     }
 
+    AppLogger.info(`▶️ 準備播放歌曲: ${track.name}`);
+
     // Determine the next player for gapless swap
     const nextPlayerKey = activePlayerRef.current === 'audio1' ? 'audio2' : 'audio1';
     const nextPlayer = nextPlayerKey === 'audio1' ? audio1Ref.current : audio2Ref.current;
@@ -720,13 +723,25 @@ const App: React.FC = () => {
 
     initAudioContext();
 
-    if (!audioContextRef.current || !analyserRef.current || !gainNodeRef.current || !destRef.current || !nextPlayer) return;
+    if (!audioContextRef.current || !analyserRef.current || !gainNodeRef.current || !destRef.current || !nextPlayer) {
+        AppLogger.warn("音訊上下文未初始化，無法播放");
+        return;
+    }
 
     // Load and play the new track on the inactive player
+    if (!track.url) {
+        AppLogger.error(`播放失敗：無效的歌曲網址 (${track.name})`);
+        window.dispatchEvent(new CustomEvent('sonicpulse-track-error'));
+        return;
+    }
+
     nextPlayer.src = track.url;
     nextPlayer.load();
-    nextPlayer.play().catch(e => {
+    nextPlayer.play().then(() => {
+        AppLogger.info(`🎵 正在播放: ${track.name}`);
+    }).catch(e => {
         console.error("Play failed:", e);
+        AppLogger.error(`播放失敗 (${track.name}): ${e.message || e}`);
         window.dispatchEvent(new CustomEvent('sonicpulse-track-error'));
     });
 
@@ -764,6 +779,7 @@ const App: React.FC = () => {
         
         // If we reach the end of the roaming playlist, fetch more!
         if (nextIndex >= roamPlaylist.length) {
+            AppLogger.info(`🔄 漫遊播放列表已達底部，正在獲取更多推薦歌曲...`);
             const lastTrack = roamPlaylist[roamPlaylist.length - 1].track;
             if (lastTrack && lastTrack.id) {
                 try {
@@ -774,16 +790,23 @@ const App: React.FC = () => {
                         let newSimilar = similar.filter(s => !existingIds.has(s.id));
                         
                         if (newSimilar.length === 0) {
+                            AppLogger.warn(`⚠️ 推薦歌曲皆已播放過，嘗試獲取備用歌單`);
                             try {
                                 const fallbackTracks = await provider.getTracks();
                                 newSimilar = fallbackTracks.filter(s => !existingIds.has(s.id)).slice(0, 5);
-                            } catch (e) {}
+                                AppLogger.info(`成功獲取 ${newSimilar.length} 首備用歌曲`);
+                            } catch (e) {
+                                AppLogger.error(`獲取備用歌單失敗: ${e}`);
+                            }
                             
                             if (newSimilar.length === 0) {
+                                AppLogger.warn(`漫遊已結束：沒有更多推薦歌曲`);
                                 setIsRoamingMode(false);
                                 showToast("漫遊已結束：沒有更多推薦歌曲");
                                 return;
                             }
+                        } else {
+                            AppLogger.info(`成功推薦 ${newSimilar.length} 首新歌曲`);
                         }
 
                         const newTracks = newSimilar.map(s => ({
@@ -806,6 +829,7 @@ const App: React.FC = () => {
                         return;
                     }
                 } catch (e) {
+                    AppLogger.error(`Failed to fetch more roaming songs: ${e}`);
                     console.error("Failed to fetch more roaming songs", e);
                 }
             }
@@ -816,6 +840,7 @@ const App: React.FC = () => {
             setRoamTrackIndex(nextIndex);
             
             const nextTrack = roamPlaylist[nextIndex];
+            AppLogger.info(`▶️ 切換到下一首漫遊歌曲: ${nextTrack.name}`);
             let url = nextTrack.url || nextTrack.track?.streamUrl || '';
             if (!url && nextTrack.track?.source === 'netease') {
                 try {
@@ -833,7 +858,16 @@ const App: React.FC = () => {
       return;
     }
     if (mainPlaylist.length === 0) return;
-    const nextIndex = (mainTrackIndex + 1) % mainPlaylist.length;
+    
+    let nextIndex;
+    const playAllBehavior = localStorage.getItem('sonicpulse_play_all_behavior') || 'insert_next';
+    if (playAllBehavior === 'shuffle') {
+        nextIndex = Math.floor(Math.random() * mainPlaylist.length);
+    } else {
+        nextIndex = (mainTrackIndex + 1) % mainPlaylist.length;
+    }
+    
+    AppLogger.info(`▶️ 序列播放下一首: ${mainPlaylist[nextIndex].name}`);
     setMainTrackIndex(nextIndex);
     playTrack(mainPlaylist[nextIndex]);
   };
@@ -1148,6 +1182,7 @@ const App: React.FC = () => {
 
     const onEnded = (e: any) => {
       if (e.target !== getActivePlayer()) return;
+      AppLogger.info(`⏹️ 歌曲播放完畢，準備切換下一首`);
       skipToNext();
       
       // Auto stop recording if in auto-render mode
@@ -1158,7 +1193,9 @@ const App: React.FC = () => {
 
     const onError = (e: any) => {
       if (e.target && e.target !== getActivePlayer()) return;
+      const errorMsg = e.target?.error ? `${e.target.error.code} - ${e.target.error.message}` : String(e);
       console.error("Audio playback error:", e.target?.error || e);
+      AppLogger.error(`⚠️ 音訊元素發生錯誤: ${errorMsg}`);
       if (errorSkipTimeoutRef.current) return;
       showToast("歌曲播放失敗，將自動跳過");
       errorSkipTimeoutRef.current = setTimeout(() => {
@@ -1169,6 +1206,7 @@ const App: React.FC = () => {
 
     const onCustomError = () => {
       if (errorSkipTimeoutRef.current) return;
+      AppLogger.error(`⚠️ 收到自訂錯誤事件，準備自動跳過`);
       showToast("歌曲播放失敗，將自動跳過");
       errorSkipTimeoutRef.current = setTimeout(() => {
           errorSkipTimeoutRef.current = null;

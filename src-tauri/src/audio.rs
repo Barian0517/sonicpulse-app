@@ -32,24 +32,40 @@ pub fn scan_local_music(path: String) -> Result<Vec<TrackMetadata>, String> {
             continue;
         }
 
-        let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
+        let ext = path
+            .extension()
+            .and_then(|e| e.to_str())
+            .unwrap_or("")
+            .to_lowercase();
         if ext != "mp3" && ext != "flac" && ext != "wav" && ext != "m4a" && ext != "ogg" {
             continue;
         }
 
         // Try to read metadata
         if let Ok(tagged_file) = Probe::open(path).and_then(|p| p.read()) {
-            let tag = tagged_file.primary_tag().or_else(|| tagged_file.first_tag());
-            
-            let mut title = path.file_stem().unwrap_or_default().to_string_lossy().to_string();
+            let tag = tagged_file
+                .primary_tag()
+                .or_else(|| tagged_file.first_tag());
+
+            let mut title = path
+                .file_stem()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .to_string();
             let mut artist = String::from("Unknown Artist");
             let mut album = String::from("Unknown Album");
             let mut has_cover = false;
 
             if let Some(tag) = tag {
-                if let Some(t) = tag.title() { title = t.to_string(); }
-                if let Some(a) = tag.artist() { artist = a.to_string(); }
-                if let Some(al) = tag.album() { album = al.to_string(); }
+                if let Some(t) = tag.title() {
+                    title = t.to_string();
+                }
+                if let Some(a) = tag.artist() {
+                    artist = a.to_string();
+                }
+                if let Some(al) = tag.album() {
+                    album = al.to_string();
+                }
                 if !tag.pictures().is_empty() {
                     has_cover = true;
                 }
@@ -81,7 +97,9 @@ pub fn get_cover_art(file_path: String) -> Result<Option<String>, String> {
     }
 
     if let Ok(tagged_file) = Probe::open(path).and_then(|p| p.read()) {
-        let tag = tagged_file.primary_tag().or_else(|| tagged_file.first_tag());
+        let tag = tagged_file
+            .primary_tag()
+            .or_else(|| tagged_file.first_tag());
         if let Some(tag) = tag {
             let pictures = tag.pictures();
             if let Some(pic) = pictures.first() {
@@ -106,7 +124,7 @@ pub fn read_lrc_file(file_path: String) -> Result<Option<String>, String> {
             return Ok(Some(content));
         }
     }
-    
+
     // Also try checking for same file name but .LRC
     lrc_path.set_extension("LRC");
     if lrc_path.exists() {
