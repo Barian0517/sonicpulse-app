@@ -5,6 +5,7 @@ export class BilibiliProvider implements MusicProvider {
     private cookie: string = '';
     private uid: string = '';
     private buvid3: string = '';
+    private buvid4: string = '';
     
     // Headers used for general Bilibili API requests
     private get headers() {
@@ -32,6 +33,7 @@ export class BilibiliProvider implements MusicProvider {
             const data = await res.json();
             if (data.data?.b_3) {
                 this.buvid3 = data.data.b_3;
+                this.buvid4 = data.data.b_4;
             }
         } catch (e) {
             console.error("Failed to fetch buvid", e);
@@ -109,11 +111,13 @@ export class BilibiliProvider implements MusicProvider {
         localStorage.removeItem('bilibili_uid');
     }
 
-    private formatDuration(durationStr: string): number {
-        const parts = durationStr.split(':').map(Number);
+    private formatDuration(durationRaw: any): number {
+        if (typeof durationRaw === 'number') return durationRaw;
+        if (!durationRaw || typeof durationRaw !== 'string') return 0;
+        const parts = durationRaw.split(':').map(Number);
         if (parts.length === 2) return parts[0] * 60 + parts[1];
         if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
-        return 0;
+        return Number(durationRaw) || 0;
     }
 
     private formatTrack(item: any): Track {
@@ -134,19 +138,35 @@ export class BilibiliProvider implements MusicProvider {
     // Search
     // Search natively bypassing WAF with correct headers
     async search(query: string, page: number = 1): Promise<{ artists: Artist[], tracks: Track[], albums: Album[] }> {
+        if (!this.buvid3 || !this.buvid4) await this.initBuvid();
+        
         const searchHeaders = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
             'Accept': 'application/json, text/plain, */*',
+            'Accept-Encoding': 'gzip, deflate, br',
             'Origin': 'https://search.bilibili.com',
             'Referer': 'https://search.bilibili.com/',
-            'Cookie': this.cookie ? (this.cookie.includes('buvid3') ? this.cookie : `${this.cookie}; buvid3=${this.buvid3}`) : `buvid3=${this.buvid3}`
+            'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6',
+            'Cookie': `buvid3=${this.buvid3};buvid4=${this.buvid4}${this.cookie ? ';' + this.cookie : ''}`
         };
 
         const params = {
-            search_type: 'video',
-            keyword: query,
+            context: "",
             page: page,
-            page_size: 20
+            order: "",
+            page_size: 20,
+            keyword: query,
+            duration: "",
+            tids_1: "",
+            tids_2: "",
+            __refresh__: true,
+            _extra: "",
+            highlight: 1,
+            single_column: 0,
+            platform: "pc",
+            from_source: "",
+            search_type: "video",
+            dynamic_offset: 0
         };
 
         const queryStr = new URLSearchParams(params as any).toString();
@@ -160,12 +180,6 @@ export class BilibiliProvider implements MusicProvider {
                 const tracks = data.data.result.map((item: any) => {
                     let title = item.title ? item.title.replace(/(\<em(.*?)\>)|(\<\/em\>)/g, "") : "";
                     
-                    let duration = item.duration || 0;
-                    if (typeof duration === 'string') {
-                        const dur = duration.split(":");
-                        duration = dur.reduce((prev, curr) => 60 * prev + +curr, 0);
-                    }
-                    
                     let cover = item.pic || item.cover;
                     if (cover && cover.startsWith('//')) cover = `https:${cover}`;
                     
@@ -173,8 +187,8 @@ export class BilibiliProvider implements MusicProvider {
                         id: String(item.bvid || item.aid),
                         title,
                         artist: item.author || '',
-                        album: item.bvid || item.aid,
-                        duration: this.formatDuration(duration),
+                        album: String(item.bvid || item.aid),
+                        duration: this.formatDuration(item.duration),
                         coverUrl: cover,
                         source: 'bilibili'
                     };

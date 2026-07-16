@@ -355,7 +355,8 @@ app.get('/plugin/proxy', async (req, res) => {
         res.status(proxyRes.status);
         
         for (const [key, value] of Object.entries(proxyRes.headers)) {
-            if (key.toLowerCase() !== 'transfer-encoding') {
+            const lowerKey = key.toLowerCase();
+            if (lowerKey !== 'transfer-encoding' && !lowerKey.startsWith('access-control-')) {
                 try {
                     res.setHeader(key, value);
                 } catch(e) {}
