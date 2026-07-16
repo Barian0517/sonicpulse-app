@@ -215,11 +215,11 @@ export class BilibiliProvider implements MusicProvider {
             throw new Error("Could not find video cid");
         }
 
-        // Fetch play url with fnval=1 to force standard MP4 which is fully compatible with howler.js on Web/HTML5 without DASH parsing
+        // Fetch play url with fnval=16 to request DASH format, which separates audio and video streams
         const playRes = await this.request('https://api.bilibili.com/x/player/playurl', {
             bvid,
             cid,
-            fnval: 1
+            fnval: 16
         });
 
         console.log("Bilibili playurl response:", playRes);

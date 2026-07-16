@@ -316,3 +316,7 @@
 [2026-07-16 16:52:36.173] [ERROR] ⚠️ 音訊元素發生錯誤: 3 - PipelineStatus::PIPELINE_ERROR_DECODE: Failed to send audio packet for decoding: {timestamp=10432000 duration=21333 size=350 is_key_frame=1 encrypted=0}
 [2026-07-16 16:56:36.078] [INFO] ▶️ 準備播放歌曲: 凭啥咱不能过六一！（原创rap） by hanser
 [2026-07-16 16:56:37.421] [INFO] 🎵 正在播放: 凭啥咱不能过六一！（原创rap） by hanser
+[2026-07-16 17:15:12.353] [INFO] ▶️ 準備播放歌曲: 去除windows11多点触控小白框 by fuhvgonv
+[2026-07-16 17:15:12.638] [INFO] 🎵 正在播放: 去除windows11多点触控小白框 by fuhvgonv
+[2026-07-16 17:15:30.397] [INFO] ▶️ 準備播放歌曲: I got smoke 但是Phonk by Woaze
+[2026-07-16 17:15:30.980] [INFO] 🎵 正在播放: I got smoke 但是Phonk by Woaze
