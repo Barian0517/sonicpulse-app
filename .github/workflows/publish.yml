@@ -54,6 +54,27 @@ jobs:
         shell: bash
         run: |
           mkdir -p src-tauri/binaries
+          mkdir -p dist-jukebox
+          # Fix pkg unmaintained node:sqlite issue with undici using cross-platform Node script
+          node -e "
+            const fs = require('fs');
+            const path = require('path');
+            function walk(dir) {
+              for (const f of fs.readdirSync(dir)) {
+                const p = path.join(dir, f);
+                if (fs.statSync(p).isDirectory()) walk(p);
+                else if (p.endsWith('.js')) {
+                  let content = fs.readFileSync(p, 'utf8');
+                  if (content.includes('node:sqlite')) {
+                    content = content.replace(/require\(['\"]node:sqlite['\"]\)/g, 'null');
+                    fs.writeFileSync(p, content);
+                  }
+                }
+              }
+            }
+            if (fs.existsSync('node_modules/undici')) walk('node_modules/undici');
+          "
+          
           if [ "${{ matrix.platform }}" == "windows-latest" ]; then
             npx pkg backend-server.cjs -t node18-win-x64 -o src-tauri/binaries/backend-x86_64-pc-windows-msvc.exe
           elif [ "${{ matrix.platform }}" == "ubuntu-22.04" ]; then
