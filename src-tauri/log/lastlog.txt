@@ -320,3 +320,5 @@
 [2026-07-16 17:15:12.638] [INFO] 🎵 正在播放: 去除windows11多点触控小白框 by fuhvgonv
 [2026-07-16 17:15:30.397] [INFO] ▶️ 準備播放歌曲: I got smoke 但是Phonk by Woaze
 [2026-07-16 17:15:30.980] [INFO] 🎵 正在播放: I got smoke 但是Phonk by Woaze
+[2026-07-17 00:45:26.839] [INFO] ▶️ 準備播放歌曲: 凭啥咱不能过六一！（原创rap） by hanser
+[2026-07-17 00:45:27.073] [INFO] 🎵 正在播放: 凭啥咱不能过六一！（原创rap） by hanser

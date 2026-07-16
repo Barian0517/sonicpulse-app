@@ -27,9 +27,20 @@ export class BilibiliProvider implements MusicProvider {
         this.initBuvid();
     }
 
+    private async tauriFetch(url: string, options: any = {}) {
+        if ((window as any).__TAURI_INTERNALS__) {
+            const { fetch: nativeFetch } = await import('@tauri-apps/plugin-http');
+            return await nativeFetch(url, options);
+        } else {
+            // Fallback for non-Tauri environment
+            const proxyUrl = `http://${window.location.hostname === 'tauri.localhost' || window.location.hostname === 'localhost' ? '127.0.0.1' : window.location.hostname}:30001/plugin/proxy?url=${encodeURIComponent(url)}&headers=${encodeURIComponent(JSON.stringify(options.headers || {}))}`;
+            return await fetch(proxyUrl, options);
+        }
+    }
+
     private async initBuvid() {
         try {
-            const res = await fetch('http://127.0.0.1:30001/plugin/proxy?url=https%3A%2F%2Fapi.bilibili.com%2Fx%2Ffrontend%2Ffinger%2Fspi');
+            const res = await this.tauriFetch('https://api.bilibili.com/x/frontend/finger/spi');
             const data = await res.json();
             if (data.data?.b_3) {
                 this.buvid3 = data.data.b_3;
@@ -40,7 +51,7 @@ export class BilibiliProvider implements MusicProvider {
         }
     }
 
-    // Proxy request using plugin-server to bypass browser CORS if needed
+    // Proxy request using Tauri native HTTP to bypass browser CORS
     private async request(url: string, params: any = {}, useCookie: boolean = true) {
         const query = new URLSearchParams(params).toString();
         const fullUrl = `${url}${query ? '?' + query : ''}`;
@@ -50,9 +61,11 @@ export class BilibiliProvider implements MusicProvider {
             'Referer': 'https://www.bilibili.com'
         };
 
-        const proxyUrl = `http://${window.location.hostname === 'tauri.localhost' || window.location.hostname === 'localhost' ? '127.0.0.1' : window.location.hostname}:30001/plugin/proxy?url=${encodeURIComponent(fullUrl)}&headers=${encodeURIComponent(JSON.stringify(headers))}`;
+        const res = await this.tauriFetch(fullUrl, {
+            method: 'GET',
+            headers: headers
+        });
         
-        const res = await fetch(proxyUrl);
         if (!res.ok) throw new Error(`Bilibili API Error: ${res.statusText}`);
         return await res.json();
     }
@@ -171,10 +184,12 @@ export class BilibiliProvider implements MusicProvider {
 
         const queryStr = new URLSearchParams(params as any).toString();
         const url = `https://api.bilibili.com/x/web-interface/search/type?${queryStr}`;
-        const proxyUrl = `http://${window.location.hostname === 'tauri.localhost' || window.location.hostname === 'localhost' ? '127.0.0.1' : window.location.hostname}:30001/plugin/proxy?url=${encodeURIComponent(url)}&headers=${encodeURIComponent(JSON.stringify(searchHeaders))}`;
 
         try {
-            const res = await fetch(proxyUrl);
+            const res = await this.tauriFetch(url, {
+                method: 'GET',
+                headers: searchHeaders
+            });
             const data = await res.json();
             if (data.code === 0 && data.data && data.data.result) {
                 const tracks = data.data.result.map((item: any) => {
