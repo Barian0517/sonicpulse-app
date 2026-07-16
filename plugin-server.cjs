@@ -9,12 +9,23 @@ const http = require('http');
 const { Server } = require('socket.io');
 const os = require('os');
 
-// Static requires to ensure `pkg` bundles these dependencies for plugins
-require('cheerio');
-require('dayjs');
-require('he');
-require('big-integer');
-require('crypto-js');
+// Prevent plugins from crashing the entire server
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('Unhandled Rejection from a plugin:', reason instanceof Error ? reason.message : reason);
+});
+process.on('uncaughtException', (err) => {
+    console.error('Uncaught Exception from a plugin:', err instanceof Error ? err.message : err);
+});
+
+// Static requires mapped for `pkg` bundled dependencies
+const bundledModules = {
+    'cheerio': require('cheerio'),
+    'dayjs': require('dayjs'),
+    'he': require('he'),
+    'big-integer': require('big-integer'),
+    'webdav': require('webdav'),
+    'crypto-js': require('crypto-js')
+};
 
 const app = express();
 app.use(cors());
@@ -114,6 +125,9 @@ function loadPlugin(filePath) {
                     // Some plugins might use axios.default or rely on it being the module itself
                     axiosInst.default = axiosInst;
                     return axiosInst;
+                }
+                if (bundledModules[moduleName]) {
+                    return bundledModules[moduleName];
                 }
                 try {
                     return require(moduleName);
@@ -355,7 +369,7 @@ app.get('/plugin/proxy', async (req, res) => {
     }
 });
 
-// API: Call plugin method
+// API: Set plugin variables
 app.post('/plugin/variables', (req, res) => {
     const { id, variables } = req.body;
     const cfg = getConfig();

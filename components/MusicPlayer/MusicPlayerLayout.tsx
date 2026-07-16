@@ -11,6 +11,8 @@ import { Track, Album } from '../../providers/MusicProvider';
 import { NavidromeView } from './NavidromeView';
 import { NeteaseView } from './NeteaseView';
 import { MusicFreeView } from './MusicFreeView';
+import { BilibiliProvider } from '../../providers/BilibiliProvider';
+import { BilibiliView } from './BilibiliView';
 import { LogViewer } from '../LogViewer';
 import { useTranslation, Language } from '../../providers/I18nProvider';
 import { io, Socket } from 'socket.io-client';
@@ -28,11 +30,12 @@ export const MusicPlayerLayout: React.FC<{
     isLyricsEnabled?: boolean;
     onToggleLyrics?: () => void;
 }> = ({ isOpen, onClose, playbackState, onTogglePlay, onSeek, onVolumeChange, onPlay, onQueueUpdate, isLyricsEnabled, onToggleLyrics }) => {
-    const [activeSource, setActiveSource] = useState<'local' | 'navidrome' | 'netease' | 'musicfree' | 'settings'>('local');
+    const [activeSource, setActiveSource] = useState<'local' | 'navidrome' | 'netease' | 'musicfree' | 'bilibili' | 'settings'>('local');
     const [localProvider] = useState(() => new LocalProvider());
     const [naviProvider] = useState(() => new NavidromeProvider());
     const [neteaseProvider] = useState(() => new NeteaseProvider());
     const [musicFreeProvider] = useState(() => new MusicFreeProvider());
+    const [bilibiliProvider] = useState(() => new BilibiliProvider());
     
     // Search & Filter State
     const [searchQuery, setSearchQuery] = useState('');
@@ -71,7 +74,7 @@ export const MusicPlayerLayout: React.FC<{
     const [lanIp, setLanIp] = useState<string>('');
     const [availableIps, setAvailableIps] = useState<string[]>([]);
 
-    const handleSourceClick = (source: 'local' | 'navidrome' | 'netease' | 'musicfree' | 'settings') => {
+    const handleSourceClick = (source: 'local' | 'navidrome' | 'netease' | 'musicfree' | 'bilibili' | 'settings') => {
         if (activeSource === source) {
             // Dispatch reload event for the active view to catch
             window.dispatchEvent(new CustomEvent('sonicpulse-reload-source', { detail: source }));
@@ -417,6 +420,8 @@ export const MusicPlayerLayout: React.FC<{
                 // Need to restore the plugin ID if it was stashed
                 if ((track as any)._pluginId) mfProvider.pluginId = (track as any)._pluginId;
                 url = await mfProvider.getStreamUrl(track.id, track);
+            } else if (track.source === 'bilibili') {
+                url = await bilibiliProvider.getStreamUrl(track.id);
             }
         } catch (e: any) {
             console.error("Play error:", e);
@@ -924,6 +929,19 @@ export const MusicPlayerLayout: React.FC<{
                         </div>
                         <span className="text-[10px] font-medium">{t('sidebar.musicfree')}</span>
                     </button>
+
+                    <button 
+                         onClick={() => handleSourceClick('bilibili')}
+                        className={`group w-14 h-14 rounded-2xl flex flex-col items-center justify-center gap-1 transition-all duration-300 ${activeSource === 'bilibili' ? 'bg-[#fb7299]/20 text-[#fb7299] shadow-[0_0_20px_rgba(251,114,153,0.3)] border border-[#fb7299]/30' : 'text-gray-500 hover:text-gray-300 hover:bg-white/5 hover:border hover:border-white/10'}`}
+                    >
+                        <div className="relative w-5 h-5 flex items-center justify-center">
+                            <PlaySquare size={20} className={`absolute transition-opacity duration-300 ${activeSource === 'bilibili' ? 'group-hover:opacity-0' : 'opacity-100'}`} />
+                            {activeSource === 'bilibili' && (
+                                <RefreshCw size={18} className="absolute opacity-0 group-hover:opacity-100 transition-opacity duration-300 animate-[spin_3s_linear_infinite]" />
+                            )}
+                        </div>
+                        <span className="text-[10px] font-medium">Bilibili</span>
+                    </button>
                 </div>
 
                 <div className="w-full flex flex-col items-center gap-4 mt-auto">
@@ -1055,6 +1073,20 @@ export const MusicPlayerLayout: React.FC<{
                         <div className="w-full h-full pb-24">
                             <MusicFreeView 
                                 provider={musicFreeProvider} 
+                                onPlayTrack={playTrack}
+                                onPlayNow={playNow}
+                                onPlayNext={playNext}
+                                onAddToQueue={addToQueue}
+                                currentTrackId={currentTrack?.id} 
+                                isPlaying={isPlaying} 
+                            />
+                        </div>
+                    )}
+
+                    {activeSource === 'bilibili' && (
+                        <div className="w-full h-full pb-24">
+                            <BilibiliView 
+                                provider={bilibiliProvider} 
                                 onPlayTrack={playTrack}
                                 onPlayNow={playNow}
                                 onPlayNext={playNext}

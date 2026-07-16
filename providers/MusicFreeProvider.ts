@@ -14,7 +14,7 @@ export class MusicFreeProvider implements MusicProvider {
     private async callPlugin(method: string, args: any[] = []): Promise<any> {
         if (!this.pluginId) throw new Error("No plugin selected");
         
-        const res = await fetch(`http://${window.location.hostname === 'tauri.localhost' ? '127.0.0.1' : window.location.hostname}:30001/plugin/call`, {
+        const res = await fetch(`http://${(window.location.hostname === 'tauri.localhost' || window.location.hostname === 'localhost') ? '127.0.0.1' : window.location.hostname}:30001/plugin/call`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -34,13 +34,13 @@ export class MusicFreeProvider implements MusicProvider {
     }
 
     async getPlugins(): Promise<any[]> {
-        const res = await fetch(`http://${window.location.hostname === 'tauri.localhost' ? '127.0.0.1' : window.location.hostname}:30001/plugins`);
+        const res = await fetch(`http://${(window.location.hostname === 'tauri.localhost' || window.location.hostname === 'localhost') ? '127.0.0.1' : window.location.hostname}:30001/plugins`);
         if (!res.ok) throw new Error('Failed to fetch plugins');
         return await res.json();
     }
 
     async installNetworkPlugin(url: string): Promise<any> {
-        const res = await fetch(`http://${window.location.hostname === 'tauri.localhost' ? '127.0.0.1' : window.location.hostname}:30001/plugin/install/url`, {
+        const res = await fetch(`http://${(window.location.hostname === 'tauri.localhost' || window.location.hostname === 'localhost') ? '127.0.0.1' : window.location.hostname}:30001/plugin/install/url`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ url })
@@ -50,7 +50,7 @@ export class MusicFreeProvider implements MusicProvider {
     }
 
     async installLocalPlugin(filePath: string): Promise<any> {
-        const res = await fetch(`http://${window.location.hostname === 'tauri.localhost' ? '127.0.0.1' : window.location.hostname}:30001/plugin/install/local`, {
+        const res = await fetch(`http://${(window.location.hostname === 'tauri.localhost' || window.location.hostname === 'localhost') ? '127.0.0.1' : window.location.hostname}:30001/plugin/install/local`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ filePath })
@@ -60,7 +60,7 @@ export class MusicFreeProvider implements MusicProvider {
     }
 
     async uninstallPlugin(id: string): Promise<any> {
-        const res = await fetch(`http://${window.location.hostname === 'tauri.localhost' ? '127.0.0.1' : window.location.hostname}:30001/plugin/uninstall`, {
+        const res = await fetch(`http://${(window.location.hostname === 'tauri.localhost' || window.location.hostname === 'localhost') ? '127.0.0.1' : window.location.hostname}:30001/plugin/uninstall`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ id })
@@ -70,7 +70,7 @@ export class MusicFreeProvider implements MusicProvider {
     }
 
     async saveVariables(id: string, variables: Record<string, string>): Promise<any> {
-        const res = await fetch(`http://${window.location.hostname === 'tauri.localhost' ? '127.0.0.1' : window.location.hostname}:30001/plugin/variables`, {
+        const res = await fetch(`http://${(window.location.hostname === 'tauri.localhost' || window.location.hostname === 'localhost') ? '127.0.0.1' : window.location.hostname}:30001/plugin/variables`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ id, variables })
@@ -111,7 +111,7 @@ export class MusicFreeProvider implements MusicProvider {
     async searchAll(query: string, pluginIds: string[]): Promise<{ artists: Artist[], albums: Album[], tracks: Track[] }> {
         const promises = pluginIds.map(async id => {
             try {
-                const res = await fetch(`http://${window.location.hostname === 'tauri.localhost' ? '127.0.0.1' : window.location.hostname}:30001/plugin/call`, {
+                const res = await fetch(`http://${(window.location.hostname === 'tauri.localhost' || window.location.hostname === 'localhost') ? '127.0.0.1' : window.location.hostname}:30001/plugin/call`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -208,7 +208,7 @@ export class MusicFreeProvider implements MusicProvider {
         try {
             const res = await this.callPlugin('getMediaSource', [trackInfo.pluginItem, quality]);
             if (res && res.url) {
-                let proxyUrl = `http://${window.location.hostname === 'tauri.localhost' ? '127.0.0.1' : window.location.hostname}:30001/plugin/proxy?url=${encodeURIComponent(res.url)}`;
+                let proxyUrl = `http://${(window.location.hostname === 'tauri.localhost' || window.location.hostname === 'localhost') ? '127.0.0.1' : window.location.hostname}:30001/plugin/proxy?url=${encodeURIComponent(res.url)}`;
                 if (res.headers && Object.keys(res.headers).length > 0) {
                     proxyUrl += `&headers=${encodeURIComponent(JSON.stringify(res.headers))}`;
                 }

@@ -10,7 +10,7 @@ export class NeteaseProvider implements MusicProvider {
         
         // Force correction if running on external network but URL is local
         const isExternalClient = window.location.hostname !== 'tauri.localhost' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
-        if (!savedUrl || savedUrl.includes('vercel.app') || (isExternalClient && (savedUrl.includes('127.0.0.1') || savedUrl.includes('localhost')))) {
+        if (!savedUrl || savedUrl.includes('vercel.app') || savedUrl.includes('localhost') || (isExternalClient && (savedUrl.includes('127.0.0.1') || savedUrl.includes('localhost')))) {
             savedUrl = `http://${window.location.hostname === 'tauri.localhost' || window.location.hostname === 'localhost' ? '127.0.0.1' : window.location.hostname}:30000`;
             localStorage.setItem('netease_server_url', savedUrl);
         }

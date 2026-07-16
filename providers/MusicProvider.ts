@@ -6,7 +6,7 @@ export interface Track {
     duration: number; // in seconds
     coverUrl?: string; // URL or data URI
     streamUrl?: string; // Local file path or API stream URL
-    source: 'local' | 'navidrome' | 'netease' | 'musicfree';
+    source: 'local' | 'navidrome' | 'netease' | 'musicfree' | 'bilibili';
     genre?: string;
     bitrate?: number;
     year?: number;
