@@ -27,6 +27,17 @@
           "sidecar": true
         }
       ]
+    },
+    {
+      "identifier": "http:default",
+      "allow": [
+        {
+          "url": "https://**"
+        },
+        {
+          "url": "http://**"
+        }
+      ]
     }
   ]
 }

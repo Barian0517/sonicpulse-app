@@ -94,13 +94,31 @@ pub fn run() {
             #[cfg(not(debug_assertions))]
             {
                 use tauri_plugin_shell::ShellExt;
+                use std::sync::{Arc, Mutex};
+                use tauri::Manager;
+                
                 match app.handle().shell().sidecar("backend") {
                     Ok(command) => {
                         match command.spawn() {
-                            Ok((mut rx, _child)) => {
+                            Ok((mut rx, child)) => {
+                                let child_arc = Arc::new(Mutex::new(Some(child)));
+                                let child_clone = child_arc.clone();
+                                
                                 tauri::async_runtime::spawn(async move {
                                     while let Some(_event) = rx.recv().await {
                                         // Keep rx alive
+                                    }
+                                });
+                                
+                                // Kill sidecar on exit
+                                app.handle().on_window_event(move |window, event| {
+                                    if let tauri::WindowEvent::Destroyed = event {
+                                        // Ensure we only kill when the main window closes
+                                        if window.label() == "main" {
+                                            if let Some(c) = child_clone.lock().unwrap().take() {
+                                                let _ = c.kill();
+                                            }
+                                        }
                                     }
                                 });
                                 println!("Backend sidecar started successfully.");

@@ -37,6 +37,7 @@ export const BilibiliView: React.FC<{
     const [qrUrl, setQrUrl] = useState<string>('');
     const [qrKey, setQrKey] = useState<string>('');
     const [qrStatus, setQrStatus] = useState<string>('');
+    const [qrErrorLog, setQrErrorLog] = useState<string>('');
 
     useEffect(() => {
         const timeout = setTimeout(async () => {
@@ -98,6 +99,7 @@ export const BilibiliView: React.FC<{
     const startLoginFlow = async () => {
         try {
             setQrStatus('產生 QR Code 中...');
+            setQrErrorLog('');
             const res = await provider.getLoginQR();
             if (res && res.url) {
                 setQrUrl(res.url);
@@ -105,10 +107,12 @@ export const BilibiliView: React.FC<{
                 setQrStatus('請使用 Bilibili App 掃描登入');
             } else {
                 setQrStatus('產生 QR Code 失敗');
+                setQrErrorLog(JSON.stringify(res));
             }
-        } catch (e) {
+        } catch (e: any) {
             console.error(e);
             setQrStatus('產生 QR Code 失敗');
+            setQrErrorLog(e.message || String(e));
         }
     };
 
@@ -356,6 +360,12 @@ export const BilibiliView: React.FC<{
                                 >
                                     重新產生 QR Code
                                 </button>
+                                {qrErrorLog && (
+                                    <div className="mt-4 text-xs text-red-400 bg-red-400/10 p-3 rounded-lg max-w-sm w-full break-all text-left overflow-y-auto max-h-32">
+                                        <p className="font-bold mb-1">Debug Log:</p>
+                                        {qrErrorLog}
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>
