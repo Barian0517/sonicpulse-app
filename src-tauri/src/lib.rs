@@ -97,28 +97,23 @@ pub fn run() {
                 use std::sync::{Arc, Mutex};
                 use tauri::Manager;
                 
+                struct SidecarGuard(Mutex<Option<tauri_plugin_shell::process::CommandChild>>);
+                impl Drop for SidecarGuard {
+                    fn drop(&mut self) {
+                        if let Some(child) = self.0.lock().unwrap().take() {
+                            let _ = child.kill();
+                        }
+                    }
+                }
+                
                 match app.handle().shell().sidecar("backend") {
                     Ok(command) => {
                         match command.spawn() {
                             Ok((mut rx, child)) => {
-                                let child_arc = Arc::new(Mutex::new(Some(child)));
-                                let child_clone = child_arc.clone();
-                                
+                                app.manage(SidecarGuard(Mutex::new(Some(child))));
                                 tauri::async_runtime::spawn(async move {
                                     while let Some(_event) = rx.recv().await {
                                         // Keep rx alive
-                                    }
-                                });
-                                
-                                // Kill sidecar on exit
-                                app.handle().on_window_event(move |window, event| {
-                                    if let tauri::WindowEvent::Destroyed = event {
-                                        // Ensure we only kill when the main window closes
-                                        if window.label() == "main" {
-                                            if let Some(c) = child_clone.lock().unwrap().take() {
-                                                let _ = c.kill();
-                                            }
-                                        }
                                     }
                                 });
                                 println!("Backend sidecar started successfully.");
