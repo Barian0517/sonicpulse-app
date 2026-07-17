@@ -97,12 +97,20 @@ pub fn run() {
                 use std::sync::{Arc, Mutex};
                 use tauri::Manager;
                 
+                struct SidecarGuard(Mutex<Option<tauri_plugin_shell::process::CommandChild>>);
+                impl Drop for SidecarGuard {
+                    fn drop(&mut self) {
+                        if let Some(c) = self.0.lock().unwrap().take() {
+                            let _ = c.kill();
+                        }
+                    }
+                }
+                
                 match app.handle().shell().sidecar("backend") {
                     Ok(command) => {
                         match command.spawn() {
                             Ok((mut rx, child)) => {
-                                let child_arc = Arc::new(Mutex::new(Some(child)));
-                                let child_clone = child_arc.clone();
+                                app.manage(SidecarGuard(Mutex::new(Some(child))));
                                 
                                 tauri::async_runtime::spawn(async move {
                                     while let Some(_event) = rx.recv().await {
@@ -110,16 +118,6 @@ pub fn run() {
                                     }
                                 });
                                 
-                                // Kill sidecar on exit
-                                if let Some(window) = app.handle().get_webview_window("main") {
-                                    window.on_window_event(move |event| {
-                                        if let tauri::WindowEvent::Destroyed = event {
-                                            if let Some(c) = child_clone.lock().unwrap().take() {
-                                                let _ = c.kill();
-                                            }
-                                        }
-                                    });
-                                }
                                 println!("Backend sidecar started successfully.");
                             }
                             Err(e) => {

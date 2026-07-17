@@ -10,6 +10,25 @@ export class BilibiliProvider implements MusicProvider {
     private wbiImgKey: string = '';
     private wbiSubKey: string = '';
     private wbiTimestamp: number = 0;
+
+    private async _fetch(url: string, options: any = {}) {
+        const useTauri = !!(window as any).__TAURI_INTERNALS__;
+        if (useTauri) {
+            const { fetch: tauriFetch } = await import('@tauri-apps/plugin-http');
+            const res = await tauriFetch(url, {
+                method: options.method || 'GET',
+                headers: options.headers || {},
+                body: options.body
+            });
+            // Polyfill .json() and .text() if needed, but Tauri fetch returns a standard Response
+            return res;
+        } else {
+            const host = window.location.hostname.endsWith('localhost') || window.location.hostname === '127.0.0.1' ? '127.0.0.1' : window.location.hostname;
+            const headersStr = options.headers ? encodeURIComponent(JSON.stringify(options.headers)) : '';
+            const proxyUrl = `http://${host}:30001/plugin/proxy?url=${encodeURIComponent(url)}${headersStr ? '&headers=' + headersStr : ''}`;
+            return fetch(proxyUrl, options);
+        }
+    }
     
     // Headers used for general Bilibili API requests
     private get headers() {
@@ -33,9 +52,7 @@ export class BilibiliProvider implements MusicProvider {
 
     private async initBuvid() {
         try {
-            const host = !!(window as any).__TAURI_INTERNALS__ || window.location.hostname.endsWith('localhost') || window.location.hostname === '127.0.0.1' ? '127.0.0.1' : window.location.hostname;
-            const proxyUrl = `http://${host}:30001/plugin/proxy?url=https%3A%2F%2Fapi.bilibili.com%2Fx%2Ffrontend%2Ffinger%2Fspi`;
-            const res = await fetch(proxyUrl);
+            const res = await this._fetch('https://api.bilibili.com/x/frontend/finger/spi');
             const data = await res.json();
             if (data.data?.b_3) {
                 this.buvid3 = data.data.b_3;
@@ -44,8 +61,7 @@ export class BilibiliProvider implements MusicProvider {
             
             // buvid activate
             const reqHeaders = { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36' };
-            const dynamicHtmlUrl = `http://${host}:30001/plugin/proxy?url=${encodeURIComponent('https://space.bilibili.com/1/dynamic')}&headers=${encodeURIComponent(JSON.stringify(reqHeaders))}`;
-            const htmlRes = await fetch(dynamicHtmlUrl);
+            const htmlRes = await this._fetch('https://space.bilibili.com/1/dynamic', { headers: reqHeaders });
             const htmlText = await htmlRes.text();
             const spmMatch = htmlText.match(/<meta name="spm_prefix" content="([^"]+?)">/);
             if (spmMatch && spmMatch[1]) {
@@ -62,10 +78,9 @@ export class BilibiliProvider implements MusicProvider {
                 
                 const activateUrl = `https://api.bilibili.com/x/internal/gaia-gateway/ExClimbWuzhi`;
                 const activateHeaders = { ...reqHeaders, 'Content-Type': 'application/json' };
-                const reqUrl = `http://${host}:30001/plugin/proxy?url=${encodeURIComponent(activateUrl)}&headers=${encodeURIComponent(JSON.stringify(activateHeaders))}`;
-                await fetch(reqUrl, {
+                await this._fetch(activateUrl, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: activateHeaders,
                     body: JSON.stringify({ payload: jsonData })
                 });
             }
@@ -138,10 +153,8 @@ export class BilibiliProvider implements MusicProvider {
             'Referer': 'https://www.bilibili.com'
         };
 
-        const host = !!(window as any).__TAURI_INTERNALS__ || window.location.hostname.endsWith('localhost') || window.location.hostname === '127.0.0.1' ? '127.0.0.1' : window.location.hostname;
-        const proxyUrl = `http://${host}:30001/plugin/proxy?url=${encodeURIComponent(fullUrl)}&headers=${encodeURIComponent(JSON.stringify(headers))}`;
+        const res = await this._fetch(fullUrl, { headers });
         
-        const res = await fetch(proxyUrl);
         if (!res.ok) throw new Error(`Bilibili API Error: ${res.statusText}`);
         return await res.json();
     }
@@ -281,11 +294,9 @@ export class BilibiliProvider implements MusicProvider {
         params = await this.signWbi(params);
         const queryStr = new URLSearchParams(params).toString();
         const url = `https://api.bilibili.com/x/web-interface/wbi/search/type?${queryStr}`;
-        const host = !!(window as any).__TAURI_INTERNALS__ || window.location.hostname.endsWith('localhost') || window.location.hostname === '127.0.0.1' ? '127.0.0.1' : window.location.hostname;
-        const proxyUrl = `http://${host}:30001/plugin/proxy?url=${encodeURIComponent(url)}&headers=${encodeURIComponent(JSON.stringify(searchHeaders))}`;
 
         try {
-            const res = await fetch(proxyUrl);
+            const res = await this._fetch(url, { headers: searchHeaders });
             const data = await res.json();
             if (data.code === 0 && data.data && data.data.result) {
                 const tracks = data.data.result.map((item: any) => {
