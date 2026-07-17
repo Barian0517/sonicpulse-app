@@ -43,7 +43,8 @@ export class BilibiliProvider implements MusicProvider {
             }
             
             // buvid activate
-            const dynamicHtmlUrl = `http://${host}:30001/plugin/proxy?url=https%3A%2F%2Fspace.bilibili.com%2F1%2Fdynamic`;
+            const reqHeaders = { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36' };
+            const dynamicHtmlUrl = `http://${host}:30001/plugin/proxy?url=${encodeURIComponent('https://space.bilibili.com/1/dynamic')}&headers=${encodeURIComponent(JSON.stringify(reqHeaders))}`;
             const htmlRes = await fetch(dynamicHtmlUrl);
             const htmlText = await htmlRes.text();
             const spmMatch = htmlText.match(/<meta name="spm_prefix" content="([^"]+?)">/);
@@ -60,8 +61,8 @@ export class BilibiliProvider implements MusicProvider {
                 });
                 
                 const activateUrl = `https://api.bilibili.com/x/internal/gaia-gateway/ExClimbWuzhi`;
-                const headers = { 'Content-Type': 'application/json' };
-                const reqUrl = `http://${host}:30001/plugin/proxy?url=${encodeURIComponent(activateUrl)}&headers=${encodeURIComponent(JSON.stringify(headers))}`;
+                const activateHeaders = { ...reqHeaders, 'Content-Type': 'application/json' };
+                const reqUrl = `http://${host}:30001/plugin/proxy?url=${encodeURIComponent(activateUrl)}&headers=${encodeURIComponent(JSON.stringify(activateHeaders))}`;
                 await fetch(reqUrl, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
