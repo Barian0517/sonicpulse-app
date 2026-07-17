@@ -110,7 +110,7 @@ function loadPlugin(filePath) {
                     return (cfg.variables && cfg.variables[filename]) || {};
                 },
                 getCookie: () => "",
-                getUserAgent: () => "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                getUserAgent: () => "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
                 md5: (str) => crypto.createHash('md5').update(str).digest('hex')
             },
             require: function(moduleName) {
@@ -118,7 +118,7 @@ function loadPlugin(filePath) {
                 if (moduleName === 'axios') {
                     const axiosInst = require('axios').create({
                         headers: {
-                            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36',
+                            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
                             'Accept': '*/*'
                         }
                     });
@@ -329,13 +329,15 @@ app.post('/plugin/variables', (req, res) => {
 });
 
 // API: Proxy audio stream with custom headers
-app.get('/plugin/proxy', async (req, res) => {
-    const targetUrl = req.query.url;
+app.all('/plugin/proxy', async (req, res) => {
+    const targetUrl = req.query.url || req.body?.url;
     if (!targetUrl) return res.status(400).send("Missing url");
 
     let customHeaders = {};
     if (req.query.headers) {
         try { customHeaders = JSON.parse(req.query.headers); } catch (e) {}
+    } else if (req.body?.headers) {
+        customHeaders = req.body.headers;
     }
     
     // Forward Range header for seeking support
@@ -345,9 +347,10 @@ app.get('/plugin/proxy', async (req, res) => {
 
     try {
         const proxyRes = await axios({
-            method: 'get',
+            method: req.method,
             url: targetUrl,
             headers: customHeaders,
+            data: req.method === 'POST' || req.method === 'PUT' ? req.body : undefined,
             responseType: 'stream',
             validateStatus: () => true // allow any status
         });
