@@ -31,7 +31,10 @@
     "active": true,
     "targets": "all",
     "externalBin": [
-      "binaries/backend"
+      "binaries/node"
+    ],
+    "resources": [
+      "backend-dist/**/*"
     ],
     "icon": [
       "icons/32x32.png",

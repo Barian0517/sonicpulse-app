@@ -106,8 +106,16 @@ pub fn run() {
                     }
                 }
                 
-                match app.handle().shell().sidecar("backend") {
+                let resource_path = app.handle()
+                    .path()
+                    .resource_dir()
+                    .expect("failed to get resource dir")
+                    .join("backend-dist")
+                    .join("backend.cjs");
+                
+                match app.handle().shell().sidecar("node") {
                     Ok(command) => {
+                        let command = command.arg(resource_path.to_string_lossy().into_owned());
                         match command.spawn() {
                             Ok((mut rx, child)) => {
                                 app.manage(SidecarGuard(Mutex::new(Some(child))));
