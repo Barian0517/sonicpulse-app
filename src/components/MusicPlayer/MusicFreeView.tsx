@@ -1,0 +1,471 @@
+import React, { useState, useEffect } from 'react';
+import { Search, Loader2, Music2, Plug, Play, PlayCircle, MoreHorizontal, Heart, Clock, ListMusic, Settings2, ShieldCheck, Download, Plus } from 'lucide-react';
+import { MusicFreeProvider } from '@/providers/MusicFreeProvider';
+import { Track } from '@/providers/MusicProvider';
+import { MusicFreePluginManager } from './MusicFreePluginManager';
+import { useTranslation } from '@/providers/I18nProvider';
+
+export const MusicFreeView: React.FC<{
+    provider: MusicFreeProvider;
+    onPlayTrack: (track: Track) => void;
+    onPlayNow: (tracks: Track[], startIndex?: number) => void;
+    onPlayNext?: (tracks: Track[]) => void;
+    onAddToQueue?: (tracks: Track[]) => void;
+    currentTrackId?: string;
+    isPlaying: boolean;
+}> = ({ provider, onPlayTrack, onPlayNow, onPlayNext, onAddToQueue, currentTrackId, isPlaying }) => {
+    const [plugins, setPlugins] = useState<any[]>([]);
+    const [selectedPluginId, setSelectedPluginId] = useState<string>('');
+    const [searchQuery, setSearchQuery] = useState('');
+    const [isSearching, setIsSearching] = useState(false);
+    const [searchResults, setSearchResults] = useState<Track[]>([]);
+    const [activeTab, setActiveTab] = useState<'search' | 'history' | 'favorites' | 'playlists' | 'plugins'>('search');
+    
+    // Menu state
+    const [menuTrackId, setMenuTrackId] = useState<string | null>(null);
+    const [menuPosition, setMenuPosition] = useState({ x: 0, y: 0 });
+
+    // Favorites and History states
+    const [favorites, setFavorites] = useState<Track[]>([]);
+    const [history, setHistory] = useState<Track[]>([]);
+    const [disabledPlugins, setDisabledPlugins] = useState<string[]>(() => {
+        try { return JSON.parse(localStorage.getItem('sonicpulse_disabled_plugins') || '[]'); } catch { return []; }
+    });
+    const { t } = useTranslation();
+
+    const enabledPlugins = plugins.filter(p => !disabledPlugins.includes(p.id));
+
+    const loadPlugins = async () => {
+        try {
+            const list = await provider.getPlugins();
+            setPlugins(list);
+            if (list.length > 0 && !selectedPluginId) {
+                setSelectedPluginId('all');
+            }
+        } catch (e) {
+            console.error("Failed to load MusicFree plugins", e);
+        }
+    };
+
+    const loadFavorites = async () => {
+        try {
+            const res = await provider.getStarred();
+            setFavorites(res.tracks || []);
+        } catch (e) {
+            console.error(e);
+        }
+    };
+
+    const loadHistory = () => {
+        try {
+            const raw = localStorage.getItem('sonicpulse_musicfree_history');
+            if (raw) setHistory(JSON.parse(raw));
+        } catch (e) { }
+    };
+
+    // Close menu on outside click
+    useEffect(() => {
+        const handleClickOutside = () => setMenuTrackId(null);
+        window.addEventListener('click', handleClickOutside);
+        return () => window.removeEventListener('click', handleClickOutside);
+    }, []);
+
+    useEffect(() => {
+        loadPlugins();
+        loadFavorites();
+        loadHistory();
+
+        const handleReload = (e: any) => {
+            if (e.detail === 'musicfree') {
+                loadPlugins();
+                loadFavorites();
+                loadHistory();
+            }
+        };
+        const handleLikedUpdated = () => {
+            loadFavorites();
+        };
+
+        const handleDisabledChanged = (e: any) => {
+            setDisabledPlugins(e.detail || []);
+        };
+
+        window.addEventListener('sonicpulse-reload-source', handleReload);
+        window.addEventListener('sonicpulse-liked-songs-updated', handleLikedUpdated);
+        window.addEventListener('sonicpulse-disabled-plugins-changed', handleDisabledChanged);
+        return () => {
+            window.removeEventListener('sonicpulse-reload-source', handleReload);
+            window.removeEventListener('sonicpulse-liked-songs-updated', handleLikedUpdated);
+            window.removeEventListener('sonicpulse-disabled-plugins-changed', handleDisabledChanged);
+        };
+    }, [provider]);
+
+    const handlePluginChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        const id = e.target.value;
+        setSelectedPluginId(id);
+        provider.setPlugin(id);
+        setSearchResults([]);
+    };
+
+    const performSearch = async (query: string) => {
+        if (!query.trim() || !selectedPluginId) return;
+        setIsSearching(true);
+        try {
+            if (selectedPluginId === 'all') {
+                const pluginIds = enabledPlugins.map(p => p.id);
+                const res = await provider.searchAll(query.trim(), pluginIds);
+                setSearchResults(res.tracks || []);
+            } else {
+                const res = await provider.search(query.trim());
+                setSearchResults(res.tracks || []);
+            }
+        } catch (e) {
+            console.error("MusicFree search failed", e);
+            setSearchResults([]);
+        } finally {
+            setIsSearching(false);
+        }
+    };
+
+    const handleToggleStar = async (e: React.MouseEvent, track: Track) => {
+        e.stopPropagation();
+        try {
+            const current = ((window as any).__sonicpulse_liked_ids || []).includes(track.id);
+            await provider.toggleStarTrack(track);
+            const ids = new Set((window as any).__sonicpulse_liked_ids || []);
+            if (!current) ids.add(track.id);
+            else ids.delete(track.id);
+            (window as any).__sonicpulse_liked_ids = Array.from(ids);
+            window.dispatchEvent(new CustomEvent('sonicpulse-toast', { detail: !current ? t('player.addLike') : t('player.cancelLike') }));
+            window.dispatchEvent(new CustomEvent('sonicpulse-liked-songs-updated'));
+            // Force re-render just to update the UI immediately
+            setSearchResults([...searchResults]);
+        } catch (error) {
+            console.error(error);
+            window.dispatchEvent(new CustomEvent('sonicpulse-toast', { detail: t('common.error') || "操作失敗" }));
+        }
+    };
+
+    const handlePlayTrack = (tracksToPlay: Track[], idx: number) => {
+        onPlayTrack(tracksToPlay[idx]);
+        // Add to history
+        const track = tracksToPlay[idx];
+        try {
+            const raw = localStorage.getItem('sonicpulse_musicfree_history') || '[]';
+            const hist: Track[] = JSON.parse(raw);
+            const newHist = [track, ...hist.filter(t => t.id !== track.id)].slice(0, 100);
+            localStorage.setItem('sonicpulse_musicfree_history', JSON.stringify(newHist));
+            setHistory(newHist);
+        } catch (e) { }
+    };
+
+    // Auto-search when query changes
+    useEffect(() => {
+        const timeout = setTimeout(() => {
+            if (activeTab === 'search') performSearch(searchQuery);
+        }, 800);
+        return () => clearTimeout(timeout);
+    }, [searchQuery, selectedPluginId, activeTab, plugins]);
+
+    const formatTime = (time: number) => {
+        if (!time || isNaN(time)) return "0:00";
+        if (time > 10000) time = Math.floor(time / 1000);
+        const mins = Math.floor(time / 60);
+        const secs = Math.floor(time % 60);
+        return `${mins}:${secs.toString().padStart(2, '0')}`;
+    };
+
+    const renderTrackList = (tracks: Track[], emptyIcon: React.ReactNode, emptyMessage: string) => {
+        if (tracks.length === 0) {
+            return (
+                <div className="flex flex-col items-center justify-center h-full text-gray-500 pb-32">
+                    <div className="mb-4 opacity-20 scale-150">{emptyIcon}</div>
+                    <p className="text-lg">{emptyMessage}</p>
+                </div>
+            );
+        }
+
+        return (
+            <div className="flex flex-col gap-2 pb-32">
+                <div className="flex items-center gap-2 mb-2">
+                    <button className="flex items-center gap-2 px-4 py-2 bg-white text-black font-bold rounded-full hover:scale-105 active:scale-95 transition-all" onClick={() => {
+                        if (onPlayNow && tracks.length > 0) onPlayNow(tracks, 0);
+                        else if (tracks.length > 0) onPlayTrack(tracks[0]);
+                    }}>
+                        <Play size={16} fill="currentColor" /> {t('player.playAll') || '播放全部'}
+                    </button>
+                </div>
+                {tracks.map((track, idx) => (
+                    <div
+                        key={track.id + idx}
+                        className={`group flex items-center gap-4 p-3 rounded-xl transition-all duration-300 border ${currentTrackId === track.id ? 'bg-purple-500/20 border-purple-500/40 shadow-[0_0_20px_rgba(168,85,247,0.15)]' : 'bg-black/20 border-white/5 hover:bg-white/5 hover:border-white/10'}`}
+                    >
+                        <div
+                            className="relative w-12 h-12 bg-white/5 rounded-lg overflow-hidden shrink-0 flex items-center justify-center shadow-inner cursor-pointer"
+                            onClick={() => handlePlayTrack(tracks, idx)}
+                        >
+                            {track.coverUrl ? (
+                                <img src={track.coverUrl} className={`w-full h-full object-cover transition-transform duration-500 ${currentTrackId === track.id ? 'scale-110' : 'group-hover:scale-110'}`} />
+                            ) : (
+                                <Music2 size={20} className="text-gray-500" />
+                            )}
+                            <div className={`absolute inset-0 bg-black/40 flex items-center justify-center transition-opacity duration-300 ${currentTrackId === track.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
+                                {currentTrackId === track.id && isPlaying ? (
+                                    <div className="w-5 h-5 flex items-center justify-center gap-0.5">
+                                        <div className="w-1 h-3 bg-purple-400 animate-pulse" />
+                                        <div className="w-1 h-5 bg-purple-400 animate-pulse delay-75" />
+                                        <div className="w-1 h-4 bg-purple-400 animate-pulse delay-150" />
+                                    </div>
+                                ) : (
+                                    <Play size={20} className="text-white ml-1 shadow-lg" fill="currentColor" />
+                                )}
+                            </div>
+                        </div>
+                        <div className="flex-1 min-w-0" onDoubleClick={() => handlePlayTrack(tracks, idx)}>
+                            <div className={`font-bold text-base truncate mb-1 ${currentTrackId === track.id ? 'text-purple-300' : 'text-white group-hover:text-purple-200'} transition-colors`}>{track.title}</div>
+                            <div className="flex items-center gap-2">
+                                <span className="text-[10px] text-purple-400 border border-purple-400/30 px-1 rounded uppercase tracking-wider shrink-0 font-bold bg-purple-400/10">
+                                    {((track as any)._pluginId && plugins.find(p => p.id === (track as any)._pluginId)?.platform) || 'MUSICFREE'}
+                                </span>
+                                <span className="text-sm text-gray-400 truncate">{track.artist}</span>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button onClick={(e) => handleToggleStar(e, track)} className={`hover:scale-110 transition-transform ${((window as any).__sonicpulse_liked_ids || []).includes(track.id) ? 'text-red-500' : 'text-gray-600 hover:text-white'}`} title={((window as any).__sonicpulse_liked_ids || []).includes(track.id) ? t('player.cancelLike') : t('player.addLike')}>
+                                <Heart size={20} className={((window as any).__sonicpulse_liked_ids || []).includes(track.id) ? 'fill-red-500' : ''} />
+                            </button>
+                            <button 
+                                className="text-gray-400 hover:text-white p-2 rounded-full hover:bg-white/10 transition-colors"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    const rect = e.currentTarget.getBoundingClientRect();
+                                    setMenuPosition({ x: rect.left, y: rect.bottom });
+                                    setMenuTrackId(track.id);
+                                }}
+                            >
+                                <MoreHorizontal size={20} />
+                            </button>
+                        </div>
+                        <div className="text-xs font-medium text-gray-500 w-16 text-right tabular-nums">
+                            {formatTime(track.duration)}
+                        </div>
+                    </div>
+                ))}
+            </div>
+        );
+    };
+
+    return (
+        <div className="flex flex-col md:flex-row h-full w-full bg-transparent text-white overflow-hidden">
+            {/* Sidebar / Top Nav */}
+            <div className="w-full h-auto md:w-56 bg-black/40 border-b md:border-b-0 md:border-r border-white/10 flex flex-row md:flex-col py-2 md:py-6 px-2 md:px-4 gap-2 backdrop-blur-md shrink-0 overflow-x-auto md:overflow-y-auto hide-scrollbar items-center md:items-stretch">
+                <div className="flex items-center gap-2 md:gap-3 px-2 md:px-3 md:pb-6 md:mb-2 md:border-b border-white/5 shrink-0">
+                    <Plug className="text-purple-400" size={18} />
+                    <span className="hidden md:inline font-black text-lg tracking-wide text-white">MusicFree</span>
+                </div>
+
+                <div className="flex flex-row md:flex-col gap-1 md:flex-1 shrink-0">
+                    <button
+                        onClick={() => setActiveTab('search')}
+                        className={`whitespace-nowrap flex items-center gap-2 md:gap-3 px-3 md:px-4 py-1.5 md:py-2.5 rounded-full md:rounded-xl font-medium transition-all text-sm ${activeTab === 'search' ? 'bg-purple-500 text-white shadow-[0_0_20px_rgba(168,85,247,0.3)]' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
+                    >
+                        <Search size={18} />
+                        {t('musicfree.searchMusic')}
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('history')}
+                        className={`whitespace-nowrap flex items-center gap-2 md:gap-3 px-3 md:px-4 py-1.5 md:py-2.5 rounded-full md:rounded-xl font-medium transition-all text-sm ${activeTab === 'history' ? 'bg-purple-500 text-white shadow-[0_0_20px_rgba(168,85,247,0.3)]' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
+                    >
+                        <Clock size={18} />
+                        {t('musicfree.playHistory')}
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('favorites')}
+                        className={`whitespace-nowrap flex items-center gap-2 md:gap-3 px-3 md:px-4 py-1.5 md:py-2.5 rounded-full md:rounded-xl font-medium transition-all text-sm ${activeTab === 'favorites' ? 'bg-purple-500 text-white shadow-[0_0_20px_rgba(168,85,247,0.3)]' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
+                    >
+                        <Heart size={18} />
+                        {t('musicfree.favorites')}
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('playlists')}
+                        className={`whitespace-nowrap flex items-center gap-2 md:gap-3 px-3 md:px-4 py-1.5 md:py-2.5 rounded-full md:rounded-xl font-medium transition-all text-sm ${activeTab === 'playlists' ? 'bg-purple-500 text-white shadow-[0_0_20px_rgba(168,85,247,0.3)]' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
+                    >
+                        <ListMusic size={18} />
+                        {t('musicfree.playlists')}
+                    </button>
+                </div>
+
+                <div className="md:mt-4 px-2 md:px-3 mb-2 shrink-0">
+                    <div className="bg-orange-500/10 border border-orange-500/20 rounded-xl p-3 shadow-[0_4px_20px_rgba(249,115,22,0.05)]">
+                        <div className="flex items-center gap-2 mb-2 flex-wrap">
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-500/20 text-blue-400 border border-blue-500/30">
+                                Beta
+                            </span>
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-500/20 text-red-400 border border-red-500/30">
+                                暫停維護
+                            </span>
+                        </div>
+                        <p className="text-xs text-orange-200/70 leading-relaxed">
+                            💡 目前僅有<strong className="text-orange-200 font-bold mx-1">網易雲 aduiomack</strong>與<strong className="text-orange-200 font-bold mx-1">Bilibili</strong>插件較為穩定，其它插件可能無法正常播放。
+                        </p>
+                    </div>
+                </div>
+
+                <div className="hidden md:block h-px bg-white/10 my-2" />
+
+                <button
+                    onClick={() => setActiveTab('plugins')}
+                    className={`whitespace-nowrap flex items-center gap-2 md:gap-3 px-3 md:px-4 py-1.5 md:py-2.5 rounded-full md:rounded-xl font-medium transition-all text-sm shrink-0 md:mb-0 mb-2 ${activeTab === 'plugins' ? 'bg-blue-500 text-white shadow-[0_0_20px_rgba(59,130,246,0.3)]' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
+                >
+                    <Settings2 size={18} />
+                    {t('pluginManager.title')}
+                </button>
+            </div>
+
+            {/* Main Content */}
+            <div className="flex-1 min-h-0 flex flex-col overflow-hidden bg-black/20 p-4 md:p-8">
+                {activeTab === 'search' && (
+                    <>
+                        <div className="flex items-center justify-between mb-8">
+                            <h2 className="text-3xl font-black tracking-tight text-white/90">{t('musicfree.searchMusic')}</h2>
+                            <div className="flex items-center gap-4">
+                                <div className="flex items-center bg-black/40 border border-white/10 rounded-xl px-4 py-2 backdrop-blur-md">
+                                    <Plug size={16} className="text-gray-400 mr-2" />
+                                    <select
+                                        value={selectedPluginId}
+                                        onChange={handlePluginChange}
+                                        className="bg-transparent text-sm font-bold text-white outline-none appearance-none cursor-pointer pr-4"
+                                    >
+                                        <option value="all" className="bg-black text-white">{t('musicfree.allPlugins')}</option>
+                                        {enabledPlugins.map(p => (
+                                            <option key={p.id} value={p.id} className="bg-[#1e1e2e] text-white">
+                                                {p.platform} (v{p.version})
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className="relative w-64">
+                                    <input
+                                        type="text"
+                                        placeholder={t('musicfree.searchPlaceholder')}
+                                        value={searchQuery}
+                                        onChange={(e) => setSearchQuery(e.target.value)}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter') {
+                                                e.preventDefault();
+                                                performSearch(searchQuery);
+                                            }
+                                        }}
+                                        className="w-full bg-black/40 border border-white/10 rounded-xl pl-10 pr-10 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-purple-500/50 transition-all backdrop-blur-md"
+                                    />
+                                    <button 
+                                        onClick={() => performSearch(searchQuery)}
+                                        className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white transition-colors"
+                                    >
+                                        <Search size={16} />
+                                    </button>
+                                    {isSearching && <Loader2 size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-purple-400 animate-spin" />}
+                                </div>
+                            </div>
+                        </div>
+                        <div className="flex-1 overflow-y-auto custom-scrollbar pr-2">
+                            {searchResults.length > 0 ? (
+                                renderTrackList(searchResults, <Search />, t('musicfree.searchResults'))
+                            ) : (
+                                <div className="w-full h-full flex flex-col items-center justify-center text-gray-500">
+                                    {searchQuery ? (
+                                        isSearching ? (
+                                            <>
+                                                <Loader2 size={48} className="animate-spin text-purple-500/50 mb-4" />
+                                                <p className="text-lg">{t('musicfree.searching')}</p>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Search size={48} className="mb-4 opacity-20" />
+                                                <p className="text-lg">{t('musicfree.noResults')}</p>
+                                            </>
+                                        )
+                                    ) : (
+                                        <>
+                                            <Search size={48} className="mb-4 opacity-20" />
+                                            <p className="text-lg">{t('musicfree.searchPrompt')}</p>
+                                        </>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    </>
+                )}
+
+                {activeTab === 'history' && (
+                    <>
+                        <h2 className="text-3xl font-black mb-8 text-white tracking-tight flex items-center gap-3">
+                            <Clock className="text-purple-400" /> {t('musicfree.recentlyPlayed')}
+                        </h2>
+                        <div className="flex-1 overflow-y-auto custom-scrollbar pr-2">
+                            {renderTrackList(history, <Clock />, t('musicfree.noHistory'))}
+                        </div>
+                    </>
+                )}
+
+                {activeTab === 'favorites' && (
+                    <>
+                        <h2 className="text-3xl font-black mb-8 text-white tracking-tight flex items-center gap-3">
+                            <Heart className="text-red-400 fill-red-400/20" /> {t('musicfree.favoriteMusic')}
+                        </h2>
+                        <div className="flex-1 overflow-y-auto custom-scrollbar pr-2">
+                            {renderTrackList(favorites, <Heart />, t('musicfree.noFavorites'))}
+                        </div>
+                    </>
+                )}
+
+                {activeTab === 'playlists' && (
+                    <>
+                        <h2 className="text-3xl font-black mb-8 text-white tracking-tight flex items-center gap-3">
+                            <ListMusic className="text-purple-400" /> {t('musicfree.playlists')}
+                        </h2>
+                        <div className="flex-1 overflow-y-auto custom-scrollbar flex flex-col items-center justify-center text-gray-500">
+                            <ShieldCheck size={48} className="mb-4 opacity-20" />
+                            <p className="text-lg">{t('musicfree.playlistsWip')}</p>
+                        </div>
+                    </>
+                )}
+
+                {activeTab === 'plugins' && (
+                    <div className="flex-1 overflow-hidden">
+                        <MusicFreePluginManager provider={provider} />
+                    </div>
+                )}
+            </div>
+            {/* Track Menu */}
+            {menuTrackId && (
+                <div 
+                    className="fixed z-50 bg-[#151520] border border-white/10 rounded-xl shadow-2xl py-2 min-w-[180px] backdrop-blur-xl text-sm"
+                    style={{ left: Math.max(10, menuPosition.x - 220), top: Math.min(menuPosition.y, window.innerHeight - 300) }}
+                    onClick={e => e.stopPropagation()}
+                >
+                    <button className="w-full text-left px-4 py-2 hover:bg-white/10 flex items-center gap-3 transition-colors" onClick={() => {
+                        const allTracks = activeTab === 'search' ? searchResults : activeTab === 'history' ? history : activeTab === 'favorites' ? favorites : [];
+                        const t = allTracks.find(tr => tr.id === menuTrackId);
+                        if (t && onPlayNext) {
+                            onPlayNext([t]);
+                        }
+                        setMenuTrackId(null);
+                    }}>
+                        <Play size={16} className="rotate-90" /> {t('player.playNext') || '下一首播放'}
+                    </button>
+                    <button className="w-full text-left px-4 py-2 hover:bg-white/10 flex items-center gap-3 transition-colors" onClick={() => {
+                        const allTracks = activeTab === 'search' ? searchResults : activeTab === 'history' ? history : activeTab === 'favorites' ? favorites : [];
+                        const t = allTracks.find(tr => tr.id === menuTrackId);
+                        if (t && onAddToQueue) {
+                            onAddToQueue([t]);
+                        }
+                        setMenuTrackId(null);
+                    }}>
+                        <Plus size={16} /> {t('player.addToQueue') || '加入序列'}
+                    </button>
+                </div>
+            )}
+        </div>
+    );
+};

@@ -1,14 +1,14 @@
-import React, { useState, useEffect, useRef } from 'react';
+﻿import React, { useState, useEffect, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { Compass, Mic2, Disc3, ListMusic, Heart, DownloadCloud, Play, Pause, Search, Star, Download, PlayCircle, Loader2, MoreHorizontal, X, SkipBack, SkipForward, Settings, Trash2, Library, Music2, ListVideo } from 'lucide-react';
-import { Track } from '../../providers/MusicProvider';
-import { NeteaseProvider } from '../../providers/NeteaseProvider';
-import { NavidromeProvider } from '../../providers/NavidromeProvider';
-import { MusicFreeProvider } from '../../providers/MusicFreeProvider';
+import { Track } from '../providers/MusicProvider';
+import { NeteaseProvider } from '../providers/NeteaseProvider';
+import { NavidromeProvider } from '../providers/NavidromeProvider';
+import { MusicFreeProvider } from '../providers/MusicFreeProvider';
 
-import { NeteaseView } from '../../components/MusicPlayer/NeteaseView';
-import { NavidromeView } from '../../components/MusicPlayer/NavidromeView';
-import { MusicFreeView } from '../../components/MusicPlayer/MusicFreeView';
+import { NeteaseView } from '../components/MusicPlayer/NeteaseView';
+import { NavidromeView } from '../components/MusicPlayer/NavidromeView';
+import { MusicFreeView } from '../components/MusicPlayer/MusicFreeView';
 
 const formatTime = (timeInSeconds: number) => {
     if (isNaN(timeInSeconds)) return "0:00";
