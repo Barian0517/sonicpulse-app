@@ -111,16 +111,15 @@ pub fn run() {
                                 });
                                 
                                 // Kill sidecar on exit
-                                app.handle().on_window_event(move |window, event| {
-                                    if let tauri::WindowEvent::Destroyed = event {
-                                        // Ensure we only kill when the main window closes
-                                        if window.label() == "main" {
+                                if let Some(window) = app.handle().get_webview_window("main") {
+                                    window.on_window_event(move |event| {
+                                        if let tauri::WindowEvent::Destroyed = event {
                                             if let Some(c) = child_clone.lock().unwrap().take() {
                                                 let _ = c.kill();
                                             }
                                         }
-                                    }
-                                });
+                                    });
+                                }
                                 println!("Backend sidecar started successfully.");
                             }
                             Err(e) => {
