@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Heart, Play, Loader2, QrCode, Globe, Tv, Folder } from 'lucide-react';
+import { Search, Heart, Play, Loader2, QrCode, Globe, Tv, Folder, Compass } from 'lucide-react';
 import { BilibiliProvider } from '../../providers/BilibiliProvider';
 import { Track, Album, Artist, Playlist } from '../../providers/MusicProvider';
 import { TrackList } from './TrackList';
 import { PlaylistDetailsView } from './PlaylistDetailsView';
 import QRCode from 'react-qr-code';
 
-type NavTab = 'search' | 'favorites' | 'playlists' | 'login';
+type NavTab = 'recommend' | 'search' | 'favorites' | 'playlists' | 'login';
 
 export const BilibiliView: React.FC<{
     provider: BilibiliProvider;
@@ -17,7 +17,7 @@ export const BilibiliView: React.FC<{
     currentTrackId?: string;
     isPlaying: boolean;
 }> = ({ provider, onPlayTrack, onPlayNow, onPlayNext, onAddToQueue, currentTrackId, isPlaying }) => {
-    const [activeTab, setActiveTab] = useState<NavTab>('search');
+    const [activeTab, setActiveTab] = useState<NavTab>('recommend');
     const [isLoading, setIsLoading] = useState(false);
 
     // States for different views
@@ -87,6 +87,11 @@ export const BilibiliView: React.FC<{
                 setIsLoading(true);
                 provider.getStarred().then(res => {
                     setTracks(res.tracks);
+                }).catch(e => console.error(e)).finally(() => setIsLoading(false));
+            } else if (activeTab === 'recommend') {
+                setIsLoading(true);
+                provider.getRecommendVideos().then(res => {
+                    setTracks(res);
                 }).catch(e => console.error(e)).finally(() => setIsLoading(false));
             } else if (activeTab === 'login' && !isLoggedIn) {
                 startLoginFlow();
@@ -178,6 +183,12 @@ export const BilibiliView: React.FC<{
                     <div className="flex md:block md:px-3 md:mb-6 shrink-0 gap-2 md:gap-0">
                         <h3 className="hidden md:block px-3 text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">探索與收藏</h3>
                         
+                        <button onClick={() => handleTabClick('recommend')} className={`whitespace-nowrap flex items-center gap-2 md:gap-3 px-3 md:px-3 py-1.5 md:py-2 rounded-full md:rounded-lg text-sm font-medium transition-colors ${activeTab === 'recommend' ? 'bg-[#fb7299]/20 text-[#fb7299]' : 'hover:bg-white/5 text-gray-300'}`}>
+                            <Compass size={18} />
+                            <span className="hidden md:inline">首頁推薦</span>
+                            <span className="md:hidden">推薦</span>
+                        </button>
+
                         <button onClick={() => handleTabClick('search')} className={`whitespace-nowrap flex items-center gap-2 md:gap-3 px-3 md:px-3 py-1.5 md:py-2 rounded-full md:rounded-lg text-sm font-medium transition-colors ${activeTab === 'search' ? 'bg-[#fb7299]/20 text-[#fb7299]' : 'hover:bg-white/5 text-gray-300'}`}>
                             <Tv size={18} />
                             <span className="hidden md:inline">影片搜尋</span>
@@ -266,6 +277,26 @@ export const BilibiliView: React.FC<{
                         <p className="text-gray-400 max-w-md">
                             在左上角輸入關鍵字即可搜尋 Bilibili 上的影片並作為音樂播放。登入後可瀏覽您的收藏與喜歡的影片。
                         </p>
+                    </div>
+                ) : activeTab === 'recommend' ? (
+                    <div className="p-8">
+                        <h2 className="text-3xl font-bold mb-8">為您推薦</h2>
+                        {isLoading ? (
+                            <div className="flex justify-center py-20"><Loader2 className="animate-spin text-[#fb7299]" size={32} /></div>
+                        ) : tracks.length > 0 ? (
+                            <TrackList 
+                                tracks={tracks} 
+                                provider={provider as any} 
+                                onPlayTrack={onPlayTrack} 
+                                onPlayNow={onPlayNow}
+                                onPlayNext={onPlayNext}
+                                onAddToQueue={onAddToQueue}
+                                currentTrackId={currentTrackId} 
+                                isPlaying={isPlaying} 
+                            />
+                        ) : (
+                            <div className="text-center py-20 text-gray-400">目前沒有推薦影片</div>
+                        )}
                     </div>
                 ) : activeTab === 'playlists' ? (
                     <div className="p-8">
