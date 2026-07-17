@@ -238,7 +238,8 @@ async function $4e63e094b4590b2b$var$getLyric(musicItem) {
             httpStatus: 1
         }
     })).data;
-    const list = res.data.lrclist;
+    const list = res?.data?.lrclist;
+    if (!list) return { rawLrc: "" };
     return {
         rawLrc: list.map((_)=>`[${_.time}]${_.lineLyric}`).join("\n")
     };
@@ -533,15 +534,7 @@ const $4e63e094b4590b2b$var$pluginInstance = {
     getRecommendSheetsByTag: $4e63e094b4590b2b$var$getRecommendSheetsByTag,
     getMusicSheetInfo: $4e63e094b4590b2b$var$getMusicSheetInfo
 };
-$4e63e094b4590b2b$var$search("童话镇", 1, "music").then((res)=>{
-    console.log(res);
-    $4e63e094b4590b2b$var$getMediaSource(res.data[0], "standard").then((res)=>{
-        console.log(res);
-    });
-    $4e63e094b4590b2b$var$getLyric(res.data[0]).then((res)=>{
-        console.log(res);
-    });
-});
+// Test code removed to prevent crash on module import
 var $4e63e094b4590b2b$export$2e2bcd8739ae039 = $4e63e094b4590b2b$var$pluginInstance;
 
 

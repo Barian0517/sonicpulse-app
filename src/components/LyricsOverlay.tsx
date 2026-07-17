@@ -29,6 +29,8 @@ export const LyricsOverlay: React.FC<LyricsOverlayProps> = ({ track, currentTime
             return;
         }
 
+        let isActive = true;
+
         // Clear lyrics immediately while fetching the new track's lyrics
         setLyrics([]);
 
@@ -108,6 +110,8 @@ export const LyricsOverlay: React.FC<LyricsOverlayProps> = ({ track, currentTime
                 }
             }
             
+            if (!isActive) return;
+
             if (lrcText) {
                 const parsed = parseLrc(lrcText);
                 if (parsed.length > 0) {
@@ -123,7 +127,11 @@ export const LyricsOverlay: React.FC<LyricsOverlayProps> = ({ track, currentTime
             }
         };
         fetchLyrics();
-    }, [track, naviProvider, localProvider]);
+
+        return () => {
+            isActive = false;
+        };
+    }, [track, naviProvider, localProvider, neteaseProvider]);
 
     useEffect(() => {
         if (lyrics.length === 0) {

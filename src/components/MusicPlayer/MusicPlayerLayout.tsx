@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Settings, Settings2, Music2, Disc, PlaySquare, Search, Library, FolderOpen, Play, Pause, SkipBack, SkipForward, Server, ChevronLeft, Heart, RefreshCw, Plug, Terminal, Info } from 'lucide-react';
+import { Settings, Settings2, Music2, Disc, PlaySquare, Search, Library, FolderOpen, Play, Pause, SkipBack, SkipForward, Server, ChevronLeft, Heart, RefreshCw, Plug, Terminal, Info, Repeat, Repeat1, Shuffle } from 'lucide-react';
 import { AuthorCard } from './AuthorCard';
 import { open } from '@tauri-apps/plugin-dialog';
 import { convertFileSrc } from '@tauri-apps/api/core';
@@ -201,6 +201,14 @@ export const MusicPlayerLayout: React.FC<{
     };
 
     // Queue State
+    const [loopMode, setLoopMode] = useState<'list' | 'single' | 'none'>(localStorage.getItem('sonicpulse_loop_mode') as 'list' | 'single' | 'none' || 'list');
+    const [shuffleMode, setShuffleMode] = useState<boolean>(localStorage.getItem('sonicpulse_shuffle_mode') === 'true');
+
+    useEffect(() => {
+        localStorage.setItem('sonicpulse_loop_mode', loopMode);
+        localStorage.setItem('sonicpulse_shuffle_mode', String(shuffleMode));
+    }, [loopMode, shuffleMode]);
+
     const [saveQueueState, setSaveQueueState] = useState(localStorage.getItem('sonicpulse_save_queue') !== 'false');
     const [queue, setQueue] = useState<Track[]>(() => {
         if (localStorage.getItem('sonicpulse_save_queue') !== 'false') {
@@ -513,13 +521,31 @@ export const MusicPlayerLayout: React.FC<{
         }
     };
 
-    const handleNext = () => {
+    const handleNext = (isAutoEnd: boolean = false) => {
         if (queue.length === 0 || queueIndex < 0) return;
-        if (queueIndex + 1 < queue.length) {
-            const nextIdx = queueIndex + 1;
-            setQueueIndex(nextIdx);
-            playTrackUrl(queue[nextIdx]);
+        
+        if (isAutoEnd && loopMode === 'single') {
+            onSeek(0);
+            playTrackUrl(queue[queueIndex]);
+            return;
         }
+
+        let nextIdx = queueIndex + 1;
+        if (shuffleMode && queue.length > 1) {
+            nextIdx = Math.floor(Math.random() * queue.length);
+            while (nextIdx === queueIndex) {
+                nextIdx = Math.floor(Math.random() * queue.length);
+            }
+        } else if (nextIdx >= queue.length) {
+            if (loopMode === 'list') {
+                nextIdx = 0;
+            } else {
+                return;
+            }
+        }
+        
+        setQueueIndex(nextIdx);
+        playTrackUrl(queue[nextIdx]);
     };
 
     const handlePrev = () => {
@@ -527,8 +553,20 @@ export const MusicPlayerLayout: React.FC<{
         if (playbackState.progress > 3) {
             // Restart current track if played for more than 3 seconds
             onSeek(0);
-        } else if (queueIndex > 0) {
-            const prevIdx = queueIndex - 1;
+        } else {
+            let prevIdx = queueIndex - 1;
+            if (shuffleMode && queue.length > 1) {
+                prevIdx = Math.floor(Math.random() * queue.length);
+                while (prevIdx === queueIndex) {
+                    prevIdx = Math.floor(Math.random() * queue.length);
+                }
+            } else if (prevIdx < 0) {
+                if (loopMode === 'list') {
+                    prevIdx = queue.length - 1;
+                } else {
+                    return;
+                }
+            }
             setQueueIndex(prevIdx);
             playTrackUrl(queue[prevIdx]);
         }
@@ -772,8 +810,8 @@ export const MusicPlayerLayout: React.FC<{
     }, [isPlaying, progress, playbackState.duration, currentTrack, queue, jukeboxSocket, jukeboxEnabled, jukeboxAllowPlayNext, jukeboxAllowControl, jukeboxAllowCutSong, jukeboxAllowModifyQueue, jukeboxPersonalMode, jukeboxSources]);
 
     useEffect(() => {
-        const onTrackEnded = () => handleNext();
-        const onExtPlayNext = () => handleNext();
+        const onTrackEnded = () => handleNext(true);
+        const onExtPlayNext = () => handleNext(false);
         const onExtPlayPrev = () => handlePrev();
         const onExtPlayIndex = (e: any) => {
             if (e.detail !== undefined && e.detail >= 0 && e.detail < queue.length) {
@@ -826,7 +864,7 @@ export const MusicPlayerLayout: React.FC<{
             window.removeEventListener('sonicpulse-clear-queue', onClearQueue);
             window.removeEventListener('sonicpulse-remove-queue-track', onRemoveQueueTrack);
         };
-    }, [queue, queueIndex]);
+    }, [queue, queueIndex, loopMode, shuffleMode]);
 
     // Keep playTrack for backward compatibility with old views, mapping it to the user's preference
     const playTrack = async (track: Track) => {
@@ -1443,13 +1481,34 @@ export const MusicPlayerLayout: React.FC<{
                             <p className="text-xs text-gray-400 truncate">{currentTrack?.artist || "-"}</p>
                         </div>
                         {currentTrack && (
-                            <button 
-                                onClick={(e) => { e.stopPropagation(); handleToggleLike(); }}
-                                className={`p-2 transition-colors active:scale-95 ${isCurrentTrackLiked ? 'text-red-500' : 'text-gray-500 hover:text-white'}`}
-                                title={isCurrentTrackLiked ? t('player.cancelLike') : t('player.addLike')}
-                            >
-                                <Heart size={20} className={isCurrentTrackLiked ? "fill-current" : ""} />
-                            </button>
+                            <div className="flex items-center gap-1">
+                                <button 
+                                    onClick={(e) => { e.stopPropagation(); setShuffleMode(!shuffleMode); }}
+                                    className={`p-2 transition-colors active:scale-95 ${shuffleMode ? 'text-purple-500' : 'text-gray-500 hover:text-white'}`}
+                                    title={t('player.shuffle') || '隨機播放'}
+                                >
+                                    <Shuffle size={18} />
+                                </button>
+                                <button 
+                                    onClick={(e) => { 
+                                        e.stopPropagation(); 
+                                        if (loopMode === 'list') setLoopMode('single');
+                                        else if (loopMode === 'single') setLoopMode('none');
+                                        else setLoopMode('list');
+                                    }}
+                                    className={`p-2 transition-colors active:scale-95 ${loopMode !== 'none' ? 'text-purple-500' : 'text-gray-500 hover:text-white'}`}
+                                    title={t('player.loop') || '循環播放'}
+                                >
+                                    {loopMode === 'single' ? <Repeat1 size={18} /> : <Repeat size={18} />}
+                                </button>
+                                <button 
+                                    onClick={(e) => { e.stopPropagation(); handleToggleLike(); }}
+                                    className={`p-2 transition-colors active:scale-95 ${isCurrentTrackLiked ? 'text-red-500' : 'text-gray-500 hover:text-white'}`}
+                                    title={isCurrentTrackLiked ? t('player.cancelLike') : t('player.addLike')}
+                                >
+                                    <Heart size={20} className={isCurrentTrackLiked ? "fill-current" : ""} />
+                                </button>
+                            </div>
                         )}
                     </div>
                     

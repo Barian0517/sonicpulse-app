@@ -1,4 +1,4 @@
-﻿import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 
 import Visualizer from './components/Visualizer';
 import Controls from './components/Controls';
@@ -537,6 +537,20 @@ const App: React.FC = () => {
   const [isRoamingMode, setIsRoamingMode] = useState(() => {
       try { return localStorage.getItem('sonicpulse_is_roaming') === 'true'; } catch(e) { return false; }
   });
+
+  const [loopMode, setLoopMode] = useState<'list' | 'single' | 'none'>(() => {
+      try { return (localStorage.getItem('sonicpulse_loop_mode') as 'list' | 'single' | 'none') || 'list'; } catch(e) { return 'list'; }
+  });
+  const [shuffleMode, setShuffleMode] = useState<boolean>(() => {
+      try { return localStorage.getItem('sonicpulse_shuffle_mode') === 'true'; } catch(e) { return false; }
+  });
+
+  useEffect(() => {
+      localStorage.setItem('sonicpulse_loop_mode', loopMode);
+  }, [loopMode]);
+  useEffect(() => {
+      localStorage.setItem('sonicpulse_shuffle_mode', shuffleMode.toString());
+  }, [shuffleMode]);
 
   useEffect(() => {
       localStorage.setItem('sonicpulse_main_playlist', JSON.stringify(mainPlaylist.map(t => ({...t, file: null}))));
@@ -1180,14 +1194,28 @@ const App: React.FC = () => {
     if (mainPlaylist.length === 0) return;
     
     let nextIndex;
-    const playAllBehavior = localStorage.getItem('sonicpulse_play_all_behavior') || 'insert_next';
-    if (playAllBehavior === 'shuffle') {
-        nextIndex = Math.floor(Math.random() * mainPlaylist.length);
+    if (shuffleMode) {
+        if (mainPlaylist.length === 1) {
+            nextIndex = 0;
+        } else {
+            nextIndex = Math.floor(Math.random() * mainPlaylist.length);
+            while (nextIndex === mainTrackIndex) {
+                nextIndex = Math.floor(Math.random() * mainPlaylist.length);
+            }
+        }
     } else {
-        nextIndex = (mainTrackIndex + 1) % mainPlaylist.length;
+        nextIndex = mainTrackIndex + 1;
+        if (nextIndex >= mainPlaylist.length) {
+            if (loopMode === 'list' || loopMode === 'single') {
+                nextIndex = 0;
+            } else {
+                setAudioState(prev => ({ ...prev, isPlaying: false }));
+                return;
+            }
+        }
     }
     
-    AppLogger.info(`▶️ 序列播放下一首: ${mainPlaylist[nextIndex].name}`);
+    AppLogger.info(`▶️ 序列播放下一首: ${mainPlaylist[nextIndex]?.name}`);
     setMainTrackIndex(nextIndex);
     playTrack(mainPlaylist[nextIndex]);
   };
@@ -1219,7 +1247,34 @@ const App: React.FC = () => {
       return;
     }
     if (mainPlaylist.length === 0) return;
-    const prevIndex = (mainTrackIndex - 1 + mainPlaylist.length) % mainPlaylist.length;
+    
+    if (currentTime > 3) {
+        handleSeek(0);
+        return;
+    }
+    
+    let prevIndex;
+    if (shuffleMode) {
+        if (mainPlaylist.length === 1) {
+            prevIndex = 0;
+        } else {
+            prevIndex = Math.floor(Math.random() * mainPlaylist.length);
+            while (prevIndex === mainTrackIndex) {
+                prevIndex = Math.floor(Math.random() * mainPlaylist.length);
+            }
+        }
+    } else {
+        prevIndex = mainTrackIndex - 1;
+        if (prevIndex < 0) {
+            if (loopMode === 'list' || loopMode === 'single') {
+                prevIndex = mainPlaylist.length - 1;
+            } else {
+                handleSeek(0);
+                return;
+            }
+        }
+    }
+    
     setMainTrackIndex(prevIndex);
     playTrack(mainPlaylist[prevIndex]);
   };
@@ -1493,6 +1548,14 @@ const App: React.FC = () => {
     };
 
     const skipToNext = () => {
+      if (loopMode === 'single') {
+         const player = getActivePlayer();
+         if (player) {
+             player.currentTime = 0;
+             player.play();
+         }
+         return;
+      }
       if (isRoamingMode && roamPlaylist.length > 0) {
         handleNextTrack();
       } else if (isExternalQueue) {
@@ -1804,6 +1867,10 @@ const App: React.FC = () => {
             onPrev={handlePrevTrack}
             currentIndex={isRoamingMode ? roamTrackIndex : mainTrackIndex}
             onSelectTrack={handleSelectTrack}
+            loopMode={loopMode}
+            setLoopMode={setLoopMode}
+            shuffleMode={shuffleMode}
+            setShuffleMode={setShuffleMode}
             isRoamingMode={isRoamingMode}
             onToggleRoaming={async (mode) => {
                 setIsRoamingMode(mode);

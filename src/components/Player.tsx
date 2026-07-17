@@ -24,9 +24,13 @@ interface PlayerProps {
   isLiked?: boolean;
   onClearPlaylist?: () => void;
   onRemoveTrack?: (index: number) => void;
+  loopMode?: 'list' | 'single' | 'none';
+  setLoopMode?: (mode: 'list' | 'single' | 'none') => void;
+  shuffleMode?: boolean;
+  setShuffleMode?: (mode: boolean) => void;
 }
 
-import { Compass, Heart as HeartIcon, Plus } from 'lucide-react';
+import { Compass, Heart as HeartIcon, Plus, Repeat, Repeat1, Shuffle } from 'lucide-react';
 
 const formatTime = (seconds: number) => {
   if (!seconds || isNaN(seconds)) return "00:00";
@@ -55,7 +59,11 @@ const Player: React.FC<PlayerProps> = ({
   onLikeTrack,
   isLiked = false,
   onClearPlaylist,
-  onRemoveTrack
+  onRemoveTrack,
+  loopMode = 'list',
+  setLoopMode,
+  shuffleMode = false,
+  setShuffleMode
 }) => {
   const [isHovering, setIsHovering] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
@@ -297,6 +305,33 @@ const Player: React.FC<PlayerProps> = ({
                             
                             {/* Action Buttons */}
                             <div className="flex items-center gap-2 pb-1 shrink-0">
+                                {setShuffleMode && (
+                                    <button 
+                                        onClick={(e) => { e.stopPropagation(); setShuffleMode(!shuffleMode); }}
+                                        className={`p-2.5 rounded-full transition-all group/btn active:scale-95 ${shuffleMode ? 'bg-purple-500/30 text-purple-300 shadow-[0_0_15px_rgba(168,85,247,0.4)] border border-purple-500/50' : 'bg-white/5 border border-white/5 hover:bg-white/10 hover:border-white/20 text-gray-400 hover:text-white'}`}
+                                        title={shuffleMode ? "隨機播放" : "順序播放"}
+                                    >
+                                        <Shuffle size={16} className={`transition-transform ${shuffleMode ? 'scale-110' : 'group-hover/btn:scale-110'}`} />
+                                    </button>
+                                )}
+                                {setLoopMode && (
+                                    <button 
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            if (loopMode === 'list') setLoopMode('single');
+                                            else if (loopMode === 'single') setLoopMode('none');
+                                            else setLoopMode('list');
+                                        }}
+                                        className={`p-2.5 rounded-full transition-all group/btn active:scale-95 ${loopMode !== 'none' ? 'bg-purple-500/30 text-purple-300 shadow-[0_0_15px_rgba(168,85,247,0.4)] border border-purple-500/50' : 'bg-white/5 border border-white/5 hover:bg-white/10 hover:border-white/20 text-gray-400 hover:text-white'}`}
+                                        title={loopMode === 'list' ? '循環列表' : loopMode === 'single' ? '單曲循環' : '不循環'}
+                                    >
+                                        {loopMode === 'single' ? (
+                                            <Repeat1 size={16} className="transition-transform scale-110" />
+                                        ) : (
+                                            <Repeat size={16} className={`transition-transform ${loopMode === 'list' ? 'scale-110' : 'group-hover/btn:scale-110'}`} />
+                                        )}
+                                    </button>
+                                )}
                                 <button 
                                     onClick={(e) => { e.stopPropagation(); if (currentTrackObj && onLikeTrack) onLikeTrack(currentTrackObj); }}
                                     className={`p-2.5 rounded-full border transition-all group/btn active:scale-95 ${isLiked ? 'bg-red-500/20 border-red-500/40 text-red-500' : 'bg-white/5 border-white/5 hover:bg-red-500/20 hover:border-red-500/40 hover:text-red-400 text-gray-400'}`}
