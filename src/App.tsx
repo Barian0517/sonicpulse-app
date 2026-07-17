@@ -417,16 +417,17 @@ const App: React.FC = () => {
   });
 
   const [config, setConfigInternal] = useState<VisualizerConfig>(() => {
+    let activeShape: VisualizerShape = VisualizerShape.Sphere;
     try {
-      let activeShape = localStorage.getItem('sonicpulse_active_shape') as VisualizerShape | null;
-      if (!activeShape) {
+      let savedShape = localStorage.getItem('sonicpulse_active_shape') as VisualizerShape | null;
+      if (!savedShape) {
          const oldSaved = localStorage.getItem(STORAGE_KEY_CONFIG);
          if (oldSaved) {
              const parsed = JSON.parse(oldSaved);
-             activeShape = parsed.shape;
+             savedShape = parsed.shape;
          }
       }
-      activeShape = activeShape || VisualizerShape.Sphere;
+      activeShape = savedShape || VisualizerShape.Sphere;
       
       const savedDictStr = localStorage.getItem('sonicpulse_configs_dict');
       if (savedDictStr) {
@@ -1631,7 +1632,7 @@ const App: React.FC = () => {
       });
       window.removeEventListener('sonicpulse-track-error', onCustomError);
     };
-  }, [isAutoRender, mainPlaylist, isRoamingMode, roamPlaylist, mainTrackIndex, roamTrackIndex, isExternalQueue]);
+  }, [isAutoRender, mainPlaylist, isRoamingMode, roamPlaylist, mainTrackIndex, roamTrackIndex, isExternalQueue, loopMode, shuffleMode]);
 
   // Overlay Window internal state
   const [isThisOverlayLocked, setIsThisOverlayLocked] = useState(() => {
