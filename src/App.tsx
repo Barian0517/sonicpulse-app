@@ -8,6 +8,7 @@ import { LyricsOverlay } from './components/LyricsOverlay';
 import { MusicPlayerLayout } from './components/MusicPlayer/MusicPlayerLayout';
 import { NeteaseProvider } from './providers/NeteaseProvider';
 import { MusicFreeProvider } from './providers/MusicFreeProvider';
+import { BilibiliProvider } from './providers/BilibiliProvider';
 import { AppLogger } from './utils/Logger';
 import { LocalProvider } from './providers/LocalProvider';
 import { NavidromeProvider } from './providers/NavidromeProvider';
@@ -583,10 +584,12 @@ const App: React.FC = () => {
     try {
         const neteaseProvider = new NeteaseProvider();
         const musicFreeProvider = new MusicFreeProvider();
+        const bilibiliProvider = new BilibiliProvider();
         
-        const [neteaseRes, musicFreeRes] = await Promise.allSettled([
+        const [neteaseRes, musicFreeRes, bilibiliRes] = await Promise.allSettled([
             neteaseProvider.getStarred(),
-            musicFreeProvider.getStarred()
+            musicFreeProvider.getStarred(),
+            bilibiliProvider.getStarred()
         ]);
 
         const allIds = new Set<string>();
@@ -596,6 +599,9 @@ const App: React.FC = () => {
         }
         if (musicFreeRes.status === 'fulfilled' && musicFreeRes.value.tracks) {
             musicFreeRes.value.tracks.forEach(t => allIds.add(String(t.id)));
+        }
+        if (bilibiliRes.status === 'fulfilled' && bilibiliRes.value.tracks) {
+            bilibiliRes.value.tracks.forEach(t => allIds.add(String(t.id)));
         }
 
         setLikedIds(allIds);
@@ -1047,6 +1053,19 @@ const App: React.FC = () => {
     if (errorSkipTimeoutRef.current) {
         clearTimeout(errorSkipTimeoutRef.current);
         errorSkipTimeoutRef.current = null;
+    }
+
+    if (track.track?.source === 'bilibili') {
+        const bp = new BilibiliProvider();
+        bp.checkHasLike(track.track.id).then(hasLike => {
+            setLikedIds(prev => {
+                const next = new Set(prev);
+                if (hasLike) next.add(track.track.id);
+                else next.delete(track.track.id);
+                (window as any).__sonicpulse_liked_ids = Array.from(next);
+                return next;
+            });
+        }).catch(() => {});
     }
 
     AppLogger.info(`▶️ 準備播放歌曲: ${track.name}`);
@@ -1974,29 +1993,32 @@ const App: React.FC = () => {
                             showToast("操作失敗，請確認網易雲登入狀態。");
                             return;
                         }
-                        const ids = new Set((window as any).__sonicpulse_liked_ids || []);
-                        if (!currentlyLiked) ids.add(track.id);
-                        else ids.delete(track.id);
-                        (window as any).__sonicpulse_liked_ids = Array.from(ids);
                     } else if (track.source === 'musicfree') {
                         const provider = new MusicFreeProvider();
                         await provider.toggleStarTrack(track);
-                        const ids = new Set((window as any).__sonicpulse_liked_ids || []);
-                        if (!currentlyLiked) ids.add(track.id);
-                        else ids.delete(track.id);
-                        (window as any).__sonicpulse_liked_ids = Array.from(ids);
                     } else if (track.source === 'navidrome' || track.source === 'local') {
                         const provider = track.source === 'local' ? new LocalProvider() : new NavidromeProvider();
                         await provider.star(track.id, 'track', !currentlyLiked);
                         // Update track.isStarred optimistically since it might be accessed directly
                         if (track) track.isStarred = !currentlyLiked;
+                    } else if (track.source === 'bilibili') {
+                        const provider = new BilibiliProvider();
+                        await provider.star(track.id, 'track', !currentlyLiked);
                     } else {
                         showToast("此來源不支援加入紅心");
                         return;
                     }
 
+                    // Synchronously update local likedIds state without fetching
+                    const newIds = new Set(likedIds);
+                    if (!currentlyLiked) newIds.add(track.id);
+                    else newIds.delete(track.id);
+                    
+                    setLikedIds(newIds);
+                    (window as any).__sonicpulse_liked_ids = Array.from(newIds);
+                    
                     showToast(!currentlyLiked ? "已加入紅心歌曲！" : "已取消紅心！");
-                    window.dispatchEvent(new CustomEvent('sonicpulse-liked-songs-updated'));
+                    window.dispatchEvent(new CustomEvent('sonicpulse-liked-songs-updated', { detail: { noFetch: true } }));
                 } catch(e: any) { 
                     showToast("加入失敗: " + e.message);
                 }

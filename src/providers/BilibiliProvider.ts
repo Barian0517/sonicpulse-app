@@ -128,19 +128,33 @@ export class BilibiliProvider implements MusicProvider {
     }
 
     // Proxy request using plugin-server to bypass browser CORS if needed
-    private async request(url: string, params: any = {}, useCookie: boolean = true) {
-        const query = new URLSearchParams(params).toString();
-        const fullUrl = `${url}${query ? '?' + query : ''}`;
+    private async request(url: string, params: any = {}, useCookie: boolean = true, method: string = 'GET') {
+        let fullUrl = url;
+        let body: any = undefined;
         
-        const headers = useCookie ? this.headers : {
+        if (method === 'GET') {
+            const query = new URLSearchParams(params).toString();
+            fullUrl = `${url}${query ? '?' + query : ''}`;
+        } else {
+            body = new URLSearchParams(params).toString();
+        }
+        
+        const headers: Record<string, string> = useCookie ? this.headers : {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
             'Referer': 'https://www.bilibili.com'
         };
 
+        if (method === 'POST') {
+            headers['Content-Type'] = 'application/x-www-form-urlencoded';
+        }
+
         const host = !!(window as any).__TAURI_INTERNALS__ || window.location.hostname.endsWith('localhost') || window.location.hostname === '127.0.0.1' ? '127.0.0.1' : window.location.hostname;
         const proxyUrl = `http://${host}:30001/plugin/proxy?url=${encodeURIComponent(fullUrl)}&headers=${encodeURIComponent(JSON.stringify(headers))}`;
         
-        const res = await fetch(proxyUrl);
+        const res = await fetch(proxyUrl, {
+            method: method,
+            body: body
+        });
         if (!res.ok) throw new Error(`Bilibili API Error: ${res.statusText}`);
         return await res.json();
     }
@@ -153,9 +167,63 @@ export class BilibiliProvider implements MusicProvider {
     async getTracks(): Promise<Track[]> { return []; }
     async downloadTrack(trackId: string): Promise<void> {}
     async getLyrics(track: Track): Promise<string | null> { return null; }
-    async createPlaylist(name: string): Promise<Playlist> { throw new Error('Not implemented'); }
-    async updatePlaylist(id: string, name?: string, tracksToAdd?: string[], tracksToRemove?: number[]): Promise<void> {}
-    async deletePlaylist(id: string): Promise<void> {}
+    async createPlaylist(name: string): Promise<Playlist> {
+        const biliJct = this.cookie.split(';').find(s => s.trim().startsWith('bili_jct='))?.split('=')[1] || '';
+        if (!biliJct) throw new Error("Not logged in");
+
+        const res = await this.request('https://api.bilibili.com/x/v3/fav/folder/add', {
+            title: name,
+            intro: '',
+            privacy: 1, // private
+            cover: '',
+            csrf: biliJct
+        }, true, 'POST');
+
+        if (res.code === 0 && res.data) {
+            return {
+                id: String(res.data.id),
+                name: name,
+                trackCount: 0,
+                coverUrl: ''
+            };
+        }
+        throw new Error(res.message || "Failed to create playlist");
+    }
+
+    async updatePlaylist(id: string, name?: string, tracksToAdd?: string[], tracksToRemove?: number[]): Promise<void> {
+        const biliJct = this.cookie.split(';').find(s => s.trim().startsWith('bili_jct='))?.split('=')[1] || '';
+        if (!biliJct) throw new Error("Not logged in");
+
+        if (tracksToAdd && tracksToAdd.length > 0) {
+            for (const bvid of tracksToAdd) {
+                try {
+                    // Convert bvid to aid
+                    const viewRes = await this.request('https://api.bilibili.com/x/web-interface/view', { bvid });
+                    if (viewRes.data && viewRes.data.aid) {
+                        const aid = viewRes.data.aid;
+                        await this.request('https://api.bilibili.com/x/v3/fav/resource/deal', {
+                            rid: aid,
+                            type: 2,
+                            add_media_ids: id,
+                            del_media_ids: '',
+                            csrf: biliJct
+                        }, true, 'POST');
+                    }
+                } catch(e) { console.error("Failed to add track to Bilibili fav folder", e); }
+            }
+        }
+    }
+
+    async deletePlaylist(id: string): Promise<void> {
+        const biliJct = this.cookie.split(';').find(s => s.trim().startsWith('bili_jct='))?.split('=')[1] || '';
+        if (!biliJct) throw new Error("Not logged in");
+
+        await this.request('https://api.bilibili.com/x/v3/fav/folder/del', {
+            media_ids: id,
+            csrf: biliJct
+        }, true, 'POST');
+    }
+
     async getAlbumTracks(albumId: string): Promise<Track[]> { return []; }
     async getCoverArt(trackId: string): Promise<string | undefined> { return undefined; }
     async setRating(id: string, rating: number): Promise<void> {}
@@ -474,14 +542,29 @@ export class BilibiliProvider implements MusicProvider {
     // Like / Unlike
     async star(id: string, type: 'track' | 'album' | 'artist', star: boolean): Promise<void> {
         if (type === 'track') {
-            const biliJct = this.cookie.split(';').find(s => s.includes('bili_jct'))?.split('=')[1] || '';
+            const biliJct = this.cookie.split(';').find(s => s.trim().startsWith('bili_jct='))?.split('=')[1] || '';
             if (!biliJct) throw new Error("Not logged in");
 
-            await this.request('https://api.bilibili.com/x/web-interface/archive/like', {
+            const res = await this.request('https://api.bilibili.com/x/web-interface/archive/like', {
                 bvid: id,
                 like: star ? 1 : 2,
                 csrf: biliJct
-            });
+            }, true, 'POST');
+            
+            if (res.code !== 0) {
+                throw new Error(res.message || "Like operation failed");
+            }
+        }
+    }
+
+    // Check Like Status
+    async checkHasLike(bvid: string): Promise<boolean> {
+        if (!this.uid) return false;
+        try {
+            const res = await this.request('https://api.bilibili.com/x/web-interface/archive/has_like', { bvid });
+            return res.code === 0 && res.data === 1;
+        } catch (e) {
+            return false;
         }
     }
 }

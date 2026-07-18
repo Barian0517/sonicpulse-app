@@ -29,7 +29,12 @@ const bundledModules = {
 
 const app = express();
 app.use(cors());
-app.use(express.json());
+// Parse JSON bodies
+app.use(express.json({ limit: '50mb' }));
+// Parse URL-encoded bodies
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+// Parse text/raw bodies if needed by proxy
+app.use(express.text({ type: 'text/plain', limit: '50mb' }));
 
 app.get('/ip', (req, res) => {
     const interfaces = os.networkInterfaces();
@@ -346,11 +351,17 @@ app.all('/plugin/proxy', async (req, res) => {
     }
 
     try {
+        // If req.body is an object but customHeaders wants form-urlencoded, we stringify it
+        let axiosData = req.method === 'POST' || req.method === 'PUT' ? req.body : undefined;
+        if (axiosData && typeof axiosData === 'object' && customHeaders['Content-Type'] === 'application/x-www-form-urlencoded') {
+            axiosData = new URLSearchParams(axiosData).toString();
+        }
+
         const proxyRes = await axios({
             method: req.method,
             url: targetUrl,
             headers: customHeaders,
-            data: req.method === 'POST' || req.method === 'PUT' ? req.body : undefined,
+            data: axiosData,
             responseType: 'stream',
             validateStatus: () => true // allow any status
         });
