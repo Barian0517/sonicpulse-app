@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Settings, Settings2, Music2, Disc, PlaySquare, Search, Library, FolderOpen, Play, Pause, SkipBack, SkipForward, Server, ChevronLeft, Heart, RefreshCw, Plug, Terminal, Info, Repeat, Repeat1, Shuffle } from 'lucide-react';
+import { Settings, Settings2, Music2, Disc, PlaySquare, Search, Library, FolderOpen, Play, Pause, SkipBack, SkipForward, Server, ChevronLeft, Heart, RefreshCw, Plug, Terminal, Info, Repeat, Repeat1, Shuffle, X } from 'lucide-react';
 import { AuthorCard } from './AuthorCard';
 import { open } from '@tauri-apps/plugin-dialog';
 import { convertFileSrc } from '@tauri-apps/api/core';
@@ -18,6 +18,73 @@ import { useTranslation, Language } from '@/providers/I18nProvider';
 import { io, Socket } from 'socket.io-client';
 import QRCode from 'react-qr-code';
 
+const ShortcutRecorder = ({ 
+    actionName, 
+    value, 
+    onChange,
+    onClear
+}: { 
+    actionName: string, 
+    value: string, 
+    onChange: (val: string) => void,
+    onClear: () => void 
+}) => {
+    const [recording, setRecording] = useState(false);
+    
+    useEffect(() => {
+        if (!recording) return;
+        const handleKeyDown = (e: KeyboardEvent) => {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            if (e.key === 'Escape') {
+                setRecording(false);
+                return;
+            }
+            
+            const parts = [];
+            if (e.ctrlKey) parts.push('Ctrl');
+            if (e.altKey) parts.push('Alt');
+            if (e.shiftKey) parts.push('Shift');
+            if (e.metaKey) parts.push('Meta');
+            
+            let key = e.key.toLowerCase();
+            if (key === ' ') key = 'space';
+            if (key === 'control' || key === 'alt' || key === 'shift' || key === 'meta') return;
+            parts.push(key);
+            
+            onChange(parts.join('+'));
+            setRecording(false);
+        };
+        
+        window.addEventListener('keydown', handleKeyDown, { capture: true });
+        return () => window.removeEventListener('keydown', handleKeyDown, { capture: true });
+    }, [recording, onChange]);
+
+    return (
+        <div className="flex items-center gap-4 bg-[#151520] p-3 rounded-xl border border-white/5">
+            <span className="text-sm font-bold w-32 text-gray-300">{actionName}</span>
+            <div 
+                className={`flex-1 h-10 rounded-lg border flex items-center justify-center cursor-pointer transition-colors ${recording ? 'bg-green-500/20 border-green-500 text-green-400 shadow-[0_0_10px_rgba(34,197,94,0.2)]' : 'bg-black/40 border-white/10 hover:border-white/30 text-white'}`}
+                onClick={() => setRecording(true)}
+            >
+                {recording ? (
+                    <span className="text-sm animate-pulse">請按下快捷鍵... (按 ESC 取消)</span>
+                ) : (
+                    <span className="text-sm font-mono tracking-wider">{value ? value.toUpperCase() : '未設定'}</span>
+                )}
+            </div>
+            <button 
+                onClick={onClear}
+                className="p-2 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors"
+                title="移除快捷鍵"
+            >
+                <X size={18} />
+            </button>
+        </div>
+    );
+};
+
 export const MusicPlayerLayout: React.FC<{ 
     isOpen: boolean; 
     onClose: () => void; 
@@ -29,7 +96,13 @@ export const MusicPlayerLayout: React.FC<{
     onQueueUpdate?: (queue: Track[], currentIndex: number) => void;
     isLyricsEnabled?: boolean;
     onToggleLyrics?: () => void;
-}> = ({ isOpen, onClose, playbackState, onTogglePlay, onSeek, onVolumeChange, onPlay, onQueueUpdate, isLyricsEnabled, onToggleLyrics }) => {
+    shortcuts?: Record<string, string>;
+    setShortcuts?: (val: Record<string, string>) => void;
+    shortcutConfig?: { requireDoubleTap: boolean; allowNextPrevInMenus: boolean; allowPlayPauseInMenus: boolean; };
+    setShortcutConfig?: (val: any) => void;
+    subtitlePreference?: 'original' | 'tw' | 'cn';
+    setSubtitlePreference?: (val: 'original' | 'tw' | 'cn') => void;
+}> = ({ isOpen, onClose, playbackState, onTogglePlay, onSeek, onVolumeChange, onPlay, onQueueUpdate, isLyricsEnabled, onToggleLyrics, shortcuts = { next: 'd', prev: 'a', playPause: ' ' }, setShortcuts, shortcutConfig = { requireDoubleTap: true, allowNextPrevInMenus: true, allowPlayPauseInMenus: false }, setShortcutConfig, subtitlePreference = 'original', setSubtitlePreference }) => {
     const [activeSource, setActiveSource] = useState<'local' | 'navidrome' | 'netease' | 'musicfree' | 'bilibili' | 'settings'>('local');
     const [localProvider] = useState(() => new LocalProvider());
     const [naviProvider] = useState(() => new NavidromeProvider());
@@ -42,7 +115,7 @@ export const MusicPlayerLayout: React.FC<{
     const [isSearching, setIsSearching] = useState(false);
     
     // Settings Tab State
-    const [activeSettingsTab, setActiveSettingsTab] = useState<'basic' | 'storage' | 'server' | 'jukebox' | 'preferences' | 'debug'>('basic');
+    const [activeSettingsTab, setActiveSettingsTab] = useState<'basic' | 'storage' | 'server' | 'jukebox' | 'preferences' | 'shortcuts' | 'debug'>('basic');
     const [showAuthorCard, setShowAuthorCard] = useState(false);
     
     // Preferences State
@@ -1163,6 +1236,12 @@ export const MusicPlayerLayout: React.FC<{
                                         <Settings2 size={18} /> {t('settings.tabs.preferences') || '偏好設定'}
                                     </button>
                                     <button 
+                                        onClick={() => setActiveSettingsTab('shortcuts')}
+                                        className={`flex items-center gap-3 px-4 py-3 rounded-xl font-bold text-sm transition-all ${activeSettingsTab === 'shortcuts' ? 'bg-green-600/20 text-green-400 border border-green-500/30 shadow-[0_0_15px_rgba(34,197,94,0.1)]' : 'text-gray-400 hover:text-white hover:bg-white/5 border border-transparent'}`}
+                                    >
+                                        ⌨️ 快捷鍵
+                                    </button>
+                                    <button 
                                         onClick={() => setActiveSettingsTab('storage')}
                                         className={`flex items-center gap-3 px-4 py-3 rounded-xl font-bold text-sm transition-all ${activeSettingsTab === 'storage' ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30 shadow-[0_0_15px_rgba(59,130,246,0.1)]' : 'text-gray-400 hover:text-white hover:bg-white/5 border border-transparent'}`}
                                     >
@@ -1207,6 +1286,20 @@ export const MusicPlayerLayout: React.FC<{
                                                     <option value="ja" className="bg-[#151520] text-white">日本語</option>
                                                     <option value="en" className="bg-[#151520] text-white">English</option>
                                                 </select>
+                                                
+                                                <div className="mt-6 pt-6 border-t border-white/10">
+                                                    <h4 className="text-md font-bold mb-3 flex items-center gap-2 text-gray-300">自動語言轉換功能</h4>
+                                                    <label className="text-xs text-gray-400 block mb-2">字幕偏好設置</label>
+                                                    <select 
+                                                        value={subtitlePreference}
+                                                        onChange={(e) => setSubtitlePreference?.(e.target.value as any)}
+                                                        className="bg-[#151520] border border-white/20 text-white text-sm rounded-xl focus:ring-purple-500 focus:border-purple-500 block w-full p-3 outline-none cursor-pointer transition-colors shadow-sm"
+                                                    >
+                                                        <option value="original" className="bg-[#151520] text-white">原版</option>
+                                                        <option value="tw" className="bg-[#151520] text-white">一律繁體</option>
+                                                        <option value="cn" className="bg-[#151520] text-white">一律簡體</option>
+                                                    </select>
+                                                </div>
                                             </div>
                                         </div>
                                     )}
@@ -1299,6 +1392,60 @@ export const MusicPlayerLayout: React.FC<{
                                                         </div>
 
                                                     </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {activeSettingsTab === 'shortcuts' && (
+                                        <div className="max-w-2xl animate-in fade-in slide-in-from-bottom-4 duration-500 flex flex-col gap-6">
+                                            <div className="bg-white/5 p-6 rounded-2xl border border-white/5 shadow-inner">
+                                                <h3 className="text-lg font-bold mb-4 flex items-center gap-2 text-green-400">⌨️ 全域快捷鍵設定</h3>
+                                                
+                                                <div className="flex flex-col gap-3 mb-6">
+                                                    <ShortcutRecorder 
+                                                        actionName="下一首" 
+                                                        value={shortcuts?.next || ''} 
+                                                        onChange={(v) => setShortcuts?.({ ...shortcuts!, next: v })}
+                                                        onClear={() => setShortcuts?.({ ...shortcuts!, next: '' })}
+                                                    />
+                                                    <ShortcutRecorder 
+                                                        actionName="上一首" 
+                                                        value={shortcuts?.prev || ''} 
+                                                        onChange={(v) => setShortcuts?.({ ...shortcuts!, prev: v })}
+                                                        onClear={() => setShortcuts?.({ ...shortcuts!, prev: '' })}
+                                                    />
+                                                    <ShortcutRecorder 
+                                                        actionName="播放/暫停切換" 
+                                                        value={shortcuts?.playPause || ''} 
+                                                        onChange={(v) => setShortcuts?.({ ...shortcuts!, playPause: v })}
+                                                        onClear={() => setShortcuts?.({ ...shortcuts!, playPause: '' })}
+                                                    />
+                                                </div>
+
+                                                <div className="bg-black/20 p-4 rounded-xl border border-white/5 flex flex-col gap-3">
+                                                    <h4 className="text-sm font-bold text-gray-300 mb-2">進階設定</h4>
+                                                    
+                                                    <label className="flex items-center gap-2 cursor-pointer">
+                                                        <input type="checkbox" checked={shortcutConfig?.requireDoubleTap} onChange={e => {
+                                                            setShortcutConfig?.({ ...shortcutConfig, requireDoubleTap: e.target.checked });
+                                                        }} className="accent-green-500" />
+                                                        <span className="text-sm text-gray-300">防誤觸 (啟用時需在 0.5 秒內連按兩下才會觸發)</span>
+                                                    </label>
+                                                    
+                                                    <label className="flex items-center gap-2 cursor-pointer">
+                                                        <input type="checkbox" checked={shortcutConfig?.allowNextPrevInMenus} onChange={e => {
+                                                            setShortcutConfig?.({ ...shortcutConfig, allowNextPrevInMenus: e.target.checked });
+                                                        }} className="accent-green-500" />
+                                                        <span className="text-sm text-gray-300">允許在其他選單 (如左側播放選單) 開啟時觸發「上一首/下一首」</span>
+                                                    </label>
+                                                    
+                                                    <label className="flex items-center gap-2 cursor-pointer">
+                                                        <input type="checkbox" checked={shortcutConfig?.allowPlayPauseInMenus} onChange={e => {
+                                                            setShortcutConfig?.({ ...shortcutConfig, allowPlayPauseInMenus: e.target.checked });
+                                                        }} className="accent-green-500" />
+                                                        <span className="text-sm text-gray-300">允許在其他選單開啟時觸發「播放/暫停切換」</span>
+                                                    </label>
                                                 </div>
                                             </div>
                                         </div>

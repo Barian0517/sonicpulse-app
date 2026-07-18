@@ -546,6 +546,29 @@ const App: React.FC = () => {
   const [shuffleMode, setShuffleMode] = useState<boolean>(() => {
       try { return localStorage.getItem('sonicpulse_shuffle_mode') === 'true'; } catch(e) { return false; }
   });
+  
+  // Shortcut State
+  const [shortcuts, setShortcuts] = useState<Record<string, string>>(() => {
+      try { 
+          const saved = localStorage.getItem('sonicpulse_shortcuts');
+          return saved ? JSON.parse(saved) : { next: 'd', prev: 'a', playPause: ' ' };
+      } catch(e) { return { next: 'd', prev: 'a', playPause: ' ' }; }
+  });
+  const [shortcutConfig, setShortcutConfig] = useState<{ requireDoubleTap: boolean, allowNextPrevInMenus: boolean, allowPlayPauseInMenus: boolean }>(() => {
+      try {
+          const saved = localStorage.getItem('sonicpulse_shortcut_config');
+          return saved ? JSON.parse(saved) : { requireDoubleTap: true, allowNextPrevInMenus: true, allowPlayPauseInMenus: false };
+      } catch(e) { return { requireDoubleTap: true, allowNextPrevInMenus: true, allowPlayPauseInMenus: false }; }
+  });
+  
+  // Subtitle Preference State
+  const [subtitlePreference, setSubtitlePreference] = useState<'original' | 'tw' | 'cn'>(() => {
+      try { return (localStorage.getItem('sonicpulse_subtitle_pref') as 'original' | 'tw' | 'cn') || 'original'; } catch(e) { return 'original'; }
+  });
+
+  useEffect(() => { localStorage.setItem('sonicpulse_shortcuts', JSON.stringify(shortcuts)); }, [shortcuts]);
+  useEffect(() => { localStorage.setItem('sonicpulse_shortcut_config', JSON.stringify(shortcutConfig)); }, [shortcutConfig]);
+  useEffect(() => { localStorage.setItem('sonicpulse_subtitle_pref', subtitlePreference); }, [subtitlePreference]);
 
   useEffect(() => {
       localStorage.setItem('sonicpulse_loop_mode', loopMode);
@@ -577,6 +600,8 @@ const App: React.FC = () => {
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
+
+
   const [isExternalQueue, setIsExternalQueue] = useState(false);
   const [likedIds, setLikedIds] = useState<Set<string>>(new Set());
 
@@ -648,6 +673,7 @@ const App: React.FC = () => {
   const [isMusicPlayerOpen, setIsMusicPlayerOpen] = useState(true);
   const [isGlobalMute, setIsGlobalMute] = useState(false);
 
+
   // Overlay State
   const [hasOverlay, setHasOverlay] = useState(false);
   const [isOverlayLocked, setIsOverlayLocked] = useState(() => {
@@ -691,8 +717,8 @@ const App: React.FC = () => {
 
   // Persist Volume and Monitor settings
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY_VOLUME, audioState.volume.toString());
-    localStorage.setItem(STORAGE_KEY_MONITOR, audioState.monitorAudio.toString());
+    if (audioState.volume !== undefined) localStorage.setItem(STORAGE_KEY_VOLUME, audioState.volume.toString());
+    if (audioState.monitorAudio !== undefined) localStorage.setItem(STORAGE_KEY_MONITOR, audioState.monitorAudio.toString());
   }, [audioState.volume, audioState.monitorAudio]);
 
   // Persist Overlay Lock status
@@ -1113,7 +1139,7 @@ const App: React.FC = () => {
       sourceToConnect.disconnect();
       sourceToConnect.connect(analyserRef.current);
       analyserRef.current.connect(gainNodeRef.current);
-      gainNodeRef.current.connect(masterGainRef.current);
+      if (masterGainRef.current) gainNodeRef.current.connect(masterGainRef.current);
       sourceToConnect.connect(destRef.current);
     }
 
@@ -1243,9 +1269,7 @@ const App: React.FC = () => {
   const handlePrevTrack = async () => {
     if (isRoamingMode) {
         if (roamPlaylist.length === 0) return;
-        if (currentTime > 3) {
-            handleSeek(0);
-        } else if (roamTrackIndex > 0) {
+        if (roamTrackIndex > 0) {
             const prevIndex = roamTrackIndex - 1;
             setRoamTrackIndex(prevIndex);
             
@@ -1267,11 +1291,6 @@ const App: React.FC = () => {
       return;
     }
     if (mainPlaylist.length === 0) return;
-    
-    if (currentTime > 3) {
-        handleSeek(0);
-        return;
-    }
     
     let prevIndex;
     if (shuffleMode) {
@@ -1501,6 +1520,71 @@ const App: React.FC = () => {
       }
     }
   };
+
+  // Global Shortcut Listener
+  useEffect(() => {
+      let lastKeyStr = '';
+      let lastKeyTime = 0;
+
+      const formatKey = (e: KeyboardEvent) => {
+          const parts = [];
+          if (e.ctrlKey) parts.push('Ctrl');
+          if (e.altKey) parts.push('Alt');
+          if (e.shiftKey) parts.push('Shift');
+          if (e.metaKey) parts.push('Meta');
+          
+          let key = e.key.toLowerCase();
+          if (key === ' ') key = 'space';
+          if (key === 'control' || key === 'alt' || key === 'shift' || key === 'meta') return '';
+          parts.push(key);
+          return parts.join('+').toLowerCase();
+      };
+
+      const handleKeyDown = (e: KeyboardEvent) => {
+          const target = e.target as HTMLElement;
+          if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) return;
+          
+          const keyStr = formatKey(e);
+          if (!keyStr) return;
+
+          const now = Date.now();
+          const isMenuOpen = isMusicPlayerOpen; // Menu is open when MusicPlayerLayout is visible
+          
+          const isNext = keyStr === shortcuts.next?.toLowerCase();
+          const isPrev = keyStr === shortcuts.prev?.toLowerCase();
+          const isPlayPause = keyStr === shortcuts.playPause?.toLowerCase();
+
+          if (!isNext && !isPrev && !isPlayPause) return;
+
+          // Check menu restrictions
+          if (isMenuOpen) {
+              if ((isNext || isPrev) && !shortcutConfig.allowNextPrevInMenus) return;
+              if (isPlayPause && !shortcutConfig.allowPlayPauseInMenus) return;
+          }
+
+          if (shortcutConfig.requireDoubleTap) {
+              if (lastKeyStr === keyStr && now - lastKeyTime < 500) {
+                  e.preventDefault();
+                  if (isNext) handleNextTrack();
+                  if (isPrev) handlePrevTrack();
+                  if (isPlayPause) togglePlay();
+                  lastKeyStr = '';
+                  lastKeyTime = 0;
+              } else {
+                  lastKeyStr = keyStr;
+                  lastKeyTime = now;
+              }
+          } else {
+              e.preventDefault();
+              if (isNext) handleNextTrack();
+              if (isPrev) handlePrevTrack();
+              if (isPlayPause) togglePlay();
+          }
+      };
+
+      window.addEventListener('keydown', handleKeyDown);
+      return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [shortcuts, shortcutConfig, isMusicPlayerOpen, handleNextTrack, handlePrevTrack, togglePlay]);
 
   const handleSeek = (time: number) => {
     const player = getActivePlayer();
@@ -1804,6 +1888,12 @@ const App: React.FC = () => {
           }}
           isLyricsEnabled={config.lyricsEnabled}
           onToggleLyrics={() => setConfig(prev => ({ ...prev, lyricsEnabled: !prev.lyricsEnabled }))}
+          shortcuts={shortcuts}
+          setShortcuts={setShortcuts}
+          shortcutConfig={shortcutConfig}
+          setShortcutConfig={setShortcutConfig}
+          subtitlePreference={subtitlePreference}
+          setSubtitlePreference={setSubtitlePreference}
       />
 
       {/* Visualizer (Now handles background internally) */}
@@ -1820,6 +1910,7 @@ const App: React.FC = () => {
              track={(isRoamingMode ? roamPlaylist[roamTrackIndex]!.track! : mainPlaylist[mainTrackIndex]!.track!)}
              currentTime={currentTime}
              config={config}
+             subtitlePreference={subtitlePreference}
          />
       )}
 

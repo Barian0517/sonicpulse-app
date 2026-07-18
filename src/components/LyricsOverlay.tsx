@@ -7,14 +7,17 @@ import { LocalProvider } from '@/providers/LocalProvider';
 import { NeteaseProvider } from '@/providers/NeteaseProvider';
 import { fetch as tauriFetch } from '@tauri-apps/plugin-http';
 import { LyricLine } from './LyricLine';
+import * as OpenCC from 'opencc-js/core';
+import * as Locale from 'opencc-js/preset';
 
 interface LyricsOverlayProps {
     track: Track | null;
     currentTime: number;
     config: VisualizerConfig;
+    subtitlePreference?: 'original' | 'tw' | 'cn';
 }
 
-export const LyricsOverlay: React.FC<LyricsOverlayProps> = ({ track, currentTime, config }) => {
+export const LyricsOverlay: React.FC<LyricsOverlayProps> = ({ track, currentTime, config, subtitlePreference = 'original' }) => {
     const [lyrics, setLyrics] = useState<ParsedLyricLine[]>([]);
     const [activeIndex, setActiveIndex] = useState(-1);
     
@@ -113,6 +116,23 @@ export const LyricsOverlay: React.FC<LyricsOverlayProps> = ({ track, currentTime
             if (!isActive) return;
 
             if (lrcText) {
+                // Apply Subtitle Translation
+                if (subtitlePreference === 'tw') {
+                    try {
+                        const converter = OpenCC.ConverterFactory(Locale.from.cn, Locale.to.tw);
+                        lrcText = converter(lrcText);
+                    } catch (e) {
+                        console.error('Subtitle conversion to TW failed', e);
+                    }
+                } else if (subtitlePreference === 'cn') {
+                    try {
+                        const converter = OpenCC.ConverterFactory(Locale.from.tw, Locale.to.cn);
+                        lrcText = converter(lrcText);
+                    } catch (e) {
+                        console.error('Subtitle conversion to CN failed', e);
+                    }
+                }
+
                 const parsed = parseLrc(lrcText);
                 if (parsed.length > 0) {
                     setLyrics(parsed);
@@ -131,7 +151,7 @@ export const LyricsOverlay: React.FC<LyricsOverlayProps> = ({ track, currentTime
         return () => {
             isActive = false;
         };
-    }, [track, naviProvider, localProvider, neteaseProvider]);
+    }, [track, naviProvider, localProvider, neteaseProvider, subtitlePreference]);
 
     useEffect(() => {
         if (lyrics.length === 0) {
