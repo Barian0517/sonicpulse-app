@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "concurrently \"node netease-server.cjs\" \"node plugin-server.cjs\" \"vite\"",
-    "build": "esbuild backend-server.cjs --bundle --platform=node --outfile=src-tauri/backend-dist/backend.cjs --external:NeteaseCloudMusicApi --allow-overwrite && node -e \"require('fs').writeFileSync('src-tauri/backend-dist/package.json', JSON.stringify({type:'commonjs',dependencies:{NeteaseCloudMusicApi:'^4.32.0'}}))\" && npm install --prefix src-tauri/backend-dist --production && vite build",
+    "build": "esbuild backend-server.cjs --bundle --platform=node --outfile=src-tauri/backend-dist/backend.cjs --external:NeteaseCloudMusicApi --allow-overwrite && node -e \"require('fs').cpSync('musicfree-plugin', 'src-tauri/backend-dist/musicfree-plugin', {recursive: true}); require('fs').writeFileSync('src-tauri/backend-dist/package.json', JSON.stringify({type:'commonjs',dependencies:{NeteaseCloudMusicApi:'^4.32.0'}}))\" && npm install --prefix src-tauri/backend-dist --production && vite build",
     "preview": "vite preview",
     "tauri": "tauri",
     "tauri:dev": "concurrently \"node netease-server.cjs\" \"node plugin-server.cjs\" \"tauri dev\""
