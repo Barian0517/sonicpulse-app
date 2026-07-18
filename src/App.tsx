@@ -2026,7 +2026,7 @@ const App: React.FC = () => {
             isLiked={(() => {
                 const tr = isRoamingMode ? roamPlaylist[roamTrackIndex]?.track : mainPlaylist[mainTrackIndex]?.track;
                 if (!tr) return false;
-                if (tr.source === 'netease' || tr.source === 'musicfree') {
+                if (tr.source === 'netease' || tr.source === 'musicfree' || tr.source === 'bilibili') {
                     return likedIds.has(tr.id);
                 }
                 return tr.isStarred || false;

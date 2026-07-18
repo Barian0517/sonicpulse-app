@@ -45,12 +45,11 @@ export const TrackList: React.FC<{
         const initialRating: Record<string, number> = {};
         const initialDownload: Record<string, 'none' | 'downloading' | 'downloaded'> = {};
 
-        // Sync with Netease global liked ids if applicable
         const likedSet = new Set((window as any).__sonicpulse_liked_ids || []);
-        const isNetease = provider.name === 'Netease Cloud Music';
+        const isLocal = provider.name === 'Local Audio' || provider.name === 'Navidrome';
 
         tracks.forEach(t => {
-            initialStar[t.id] = isNetease ? likedSet.has(t.id) : (t.isStarred || false);
+            initialStar[t.id] = !isLocal ? likedSet.has(String(t.id)) : (t.isStarred || false);
             initialRating[t.id] = t.rating || 0;
             if (offlineManager.isDownloaded(t.id)) {
                 initialDownload[t.id] = 'downloaded';
@@ -65,12 +64,13 @@ export const TrackList: React.FC<{
 
     useEffect(() => {
         const syncLikedSongs = () => {
-            if (provider.name !== 'Netease Cloud Music') return;
+            const isLocal = provider.name === 'Local Audio' || provider.name === 'Navidrome';
+            if (isLocal) return;
             const likedSet = new Set((window as any).__sonicpulse_liked_ids || []);
             setStarredStatus(prev => {
                 const next = { ...prev };
                 tracks.forEach(t => {
-                    next[t.id] = likedSet.has(t.id);
+                    next[t.id] = likedSet.has(String(t.id));
                 });
                 return next;
             });
@@ -85,22 +85,29 @@ export const TrackList: React.FC<{
         // Optimistic UI update
         setStarredStatus(prev => ({ ...prev, [track.id]: !current }));
         try {
-            if (provider.name === 'Netease Cloud Music') {
-                const ok = await (provider as any).likeSong(track.id, !current);
-                if (ok) {
-                    window.dispatchEvent(new CustomEvent('sonicpulse-toast', { detail: !current ? t('player.addLike') : t('player.cancelLike') }));
-                    
-                    // Update global cache
-                    const ids = new Set((window as any).__sonicpulse_liked_ids || []);
-                    if (!current) ids.add(track.id);
-                    else ids.delete(track.id);
-                    (window as any).__sonicpulse_liked_ids = Array.from(ids);
-                    
-                    window.dispatchEvent(new CustomEvent('sonicpulse-liked-songs-updated'));
-                } else {
-                    window.dispatchEvent(new CustomEvent('sonicpulse-toast', { detail: t('common.error') || "加入紅心失敗" }));
-                    setStarredStatus(prev => ({ ...prev, [track.id]: current })); // Revert
+            if (provider.name !== 'Local Audio' && provider.name !== 'Navidrome') {
+                if (provider.name === 'Netease Cloud Music') {
+                    const ok = await (provider as any).likeSong(track.id, !current);
+                    if (!ok) {
+                        window.dispatchEvent(new CustomEvent('sonicpulse-toast', { detail: t('common.error') || "加入紅心失敗" }));
+                        setStarredStatus(prev => ({ ...prev, [track.id]: current })); // Revert
+                        return;
+                    }
+                } else if (provider.name === 'MusicFree') {
+                    await (provider as any).toggleStarTrack(track);
+                } else if (provider.name === 'Bilibili') {
+                    await provider.star(track.id, 'track', !current);
                 }
+                
+                window.dispatchEvent(new CustomEvent('sonicpulse-toast', { detail: !current ? t('player.addLike') : t('player.cancelLike') }));
+                
+                // Update global cache
+                const ids = new Set((window as any).__sonicpulse_liked_ids || []);
+                if (!current) ids.add(String(track.id));
+                else ids.delete(String(track.id));
+                (window as any).__sonicpulse_liked_ids = Array.from(ids);
+                
+                window.dispatchEvent(new CustomEvent('sonicpulse-liked-songs-updated', { detail: { noFetch: true } }));
             } else {
                 await provider.star(track.id, 'track', !current);
             }
