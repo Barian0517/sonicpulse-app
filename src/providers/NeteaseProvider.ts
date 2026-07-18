@@ -244,10 +244,13 @@ export class NeteaseProvider implements MusicProvider {
         };
     }
 
-    async updatePlaylist(id: string, name?: string, tracksToAdd?: string[], tracksToRemove?: number[]): Promise<void> {
+    async updatePlaylist(id: string, name?: string, tracksToAdd?: string[], tracksToRemove?: any[]): Promise<void> {
         // Note: Netease uses track ID for removal, not index
         if (tracksToAdd && tracksToAdd.length > 0) {
             await this.request('/playlist/tracks', { op: 'add', pid: id, tracks: tracksToAdd.join(',') });
+        }
+        if (tracksToRemove && tracksToRemove.length > 0) {
+            await this.request('/playlist/tracks', { op: 'del', pid: id, tracks: tracksToRemove.join(',') });
         }
     }
 

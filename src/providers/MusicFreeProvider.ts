@@ -271,7 +271,7 @@ export class MusicFreeProvider implements MusicProvider {
     }
     async setRating(id: string, rating: number): Promise<void> {}
     async createPlaylist(name: string): Promise<Playlist> { throw new Error('Not implemented'); }
-    async updatePlaylist(id: string, name?: string, tracksToAdd?: string[], tracksToRemove?: number[]): Promise<void> {}
+    async updatePlaylist(id: string, name?: string, tracksToAdd?: string[], tracksToRemove?: any[]): Promise<void> {}
     async deletePlaylist(id: string): Promise<void> {}
     async getPlaylistTracks(playlistId: string): Promise<Track[]> { return []; }
     async getAlbumTracks(albumId: string): Promise<Track[]> { return []; }

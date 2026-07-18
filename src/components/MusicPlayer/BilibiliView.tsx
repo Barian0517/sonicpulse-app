@@ -208,7 +208,11 @@ export const BilibiliView: React.FC<{
                         </button>
                     </div>
                     
-                    <div className="flex md:block md:px-3 md:mb-6 md:mt-auto md:pt-6 shrink-0 ml-auto md:ml-0">
+                    <div className="flex flex-col md:px-3 md:mb-6 md:mt-auto md:pt-6 shrink-0 ml-auto md:ml-0 gap-4">
+                        <div className="hidden md:block bg-red-500/10 border border-red-500/20 rounded-lg p-3 text-xs text-red-300">
+                            <strong className="block mb-1">⚠️ 溫馨提示</strong>
+                            <span className="opacity-80 leading-relaxed">受 B 站風控影響，目前應用內只能「取消按讚」無法「按讚」。請多多利用「收藏」功能！</span>
+                        </div>
                         {!isLoggedIn ? (
                             <button onClick={() => handleTabClick('login')} className={`whitespace-nowrap flex items-center gap-2 md:gap-3 px-3 md:px-3 py-1.5 md:py-2 rounded-full md:rounded-lg text-sm font-medium transition-colors ${activeTab === 'login' ? 'bg-[#fb7299]/20 text-[#fb7299]' : 'hover:bg-white/5 text-gray-300'}`}>
                                 <QrCode size={18} />

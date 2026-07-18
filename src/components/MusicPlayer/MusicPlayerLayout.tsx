@@ -148,9 +148,9 @@ export const MusicPlayerLayout: React.FC<{
                 setIsCurrentTrackLiked(false);
                 return;
             }
-            if (currentTrack.source === 'netease') {
+            if (currentTrack.source === 'netease' || currentTrack.source === 'musicfree' || currentTrack.source === 'bilibili') {
                 const likedSet = new Set((window as any).__sonicpulse_liked_ids || []);
-                setIsCurrentTrackLiked(likedSet.has(currentTrack.id));
+                setIsCurrentTrackLiked(likedSet.has(String(currentTrack.id)));
             } else {
                 setIsCurrentTrackLiked(currentTrack.isStarred || false);
             }
@@ -181,6 +181,15 @@ export const MusicPlayerLayout: React.FC<{
                 }
             } else if (currentTrack.source === 'musicfree') {
                 await musicFreeProvider.toggleStarTrack(currentTrack);
+                window.dispatchEvent(new CustomEvent('sonicpulse-toast', { detail: !currentStatus ? "已加入紅心歌曲" : "已取消紅心" }));
+                const ids = new Set((window as any).__sonicpulse_liked_ids || []);
+                if (!currentStatus) ids.add(currentTrack.id);
+                else ids.delete(currentTrack.id);
+                (window as any).__sonicpulse_liked_ids = Array.from(ids);
+                window.dispatchEvent(new CustomEvent('sonicpulse-liked-songs-updated'));
+            } else if (currentTrack.source === 'bilibili') {
+                const provider = new BilibiliProvider();
+                await provider.star(currentTrack.id, 'track', !currentStatus);
                 window.dispatchEvent(new CustomEvent('sonicpulse-toast', { detail: !currentStatus ? "已加入紅心歌曲" : "已取消紅心" }));
                 const ids = new Set((window as any).__sonicpulse_liked_ids || []);
                 if (!currentStatus) ids.add(currentTrack.id);
@@ -1518,7 +1527,7 @@ export const MusicPlayerLayout: React.FC<{
                             <button onClick={onTogglePlay} className="w-10 h-10 bg-white text-black rounded-full flex items-center justify-center hover:scale-105 transition-transform shadow-lg">
                                 {isPlaying ? <Pause size={20} fill="currentColor" /> : <Play size={20} fill="currentColor" className="ml-1" />}
                             </button>
-                            <button onClick={handleNext} className="text-gray-500 hover:text-white transition-colors"><SkipForward size={20} fill="currentColor" /></button>
+                            <button onClick={() => handleNext(false)} className="text-gray-500 hover:text-white transition-colors"><SkipForward size={20} fill="currentColor" /></button>
                         </div>
                         <div className="w-full max-w-md flex items-center gap-3 text-[10px] text-gray-400 font-mono">
                             <span className="w-8 text-right">{formatTime(localSeek !== null ? localSeek : progress)}</span>

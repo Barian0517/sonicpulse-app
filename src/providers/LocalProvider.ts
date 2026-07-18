@@ -93,7 +93,7 @@ export class LocalProvider implements MusicProvider {
     }
 
     async createPlaylist(name: string): Promise<Playlist> { throw new Error('Not implemented'); }
-    async updatePlaylist(id: string, name?: string, tracksToAdd?: string[], tracksToRemove?: number[]): Promise<void> {}
+    async updatePlaylist(id: string, name?: string, tracksToAdd?: string[], tracksToRemove?: any[]): Promise<void> {}
     async deletePlaylist(id: string): Promise<void> {}
     async downloadTrack(trackId: string): Promise<void> {}
 

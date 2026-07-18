@@ -253,7 +253,7 @@ export class NavidromeProvider implements MusicProvider {
         return { id: res.playlist.id, name: res.playlist.name, trackCount: res.playlist.songCount || 0 };
     }
 
-    async updatePlaylist(id: string, name?: string, tracksToAdd?: string[], tracksToRemove?: number[]): Promise<void> {
+    async updatePlaylist(id: string, name?: string, tracksToAdd?: string[], tracksToRemove?: any[]): Promise<void> {
         const params: Record<string, any> = { playlistId: id };
         if (name) params.name = name;
         if (tracksToAdd && tracksToAdd.length > 0) {

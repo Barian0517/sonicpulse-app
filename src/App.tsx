@@ -1558,6 +1558,20 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    const handleLikedUpdated = () => {
+        const savedLiked = (window as any).__sonicpulse_liked_ids || localStorage.getItem('sonicpulse_liked_ids');
+        if (savedLiked) {
+            try {
+                const parsed = typeof savedLiked === 'string' ? JSON.parse(savedLiked) : savedLiked;
+                setLikedIds(new Set(parsed));
+            } catch(e) {}
+        }
+    };
+    window.addEventListener('sonicpulse-liked-songs-updated', handleLikedUpdated);
+    return () => window.removeEventListener('sonicpulse-liked-songs-updated', handleLikedUpdated);
+  }, []);
+
+  useEffect(() => {
     const players = [audio1Ref.current, audio2Ref.current];
     
     const onTimeUpdate = (e: any) => {
@@ -1780,19 +1794,7 @@ const App: React.FC = () => {
           onSeek={handleSeek}
           onVolumeChange={handleVolumeChange}
           onPlay={(trackUrl, title, coverUrl, track) => {
-              // Convert to the format App.tsx expects
-              const mapped = {
-                  name: title,
-                  url: trackUrl,
-                  file: null,
-                  track: track
-              };
-              // Only override playlist if we aren't using an external queue
-              if (!isExternalQueue) {
-                  setMainPlaylist([mapped]);
-                  setMainTrackIndex(0);
-                  setIsRoamingMode(false);
-              }
+              const mapped = { name: title, url: trackUrl, file: null, track: track };
               playTrack(mapped);
           }}
           onQueueUpdate={(queue, currentIndex) => {
@@ -1984,7 +1986,8 @@ const App: React.FC = () => {
             }}
             onLikeTrack={async (track) => {
                 try {
-                    const currentlyLiked = track ? likedIds.has(track.id) : (track?.isStarred || false);
+                    const trackId = String(track?.id || '');
+                    const currentlyLiked = track ? likedIds.has(trackId) : (track?.isStarred || false);
                     
                     if (track.source === 'netease') {
                         const provider = new NeteaseProvider();
@@ -2011,11 +2014,12 @@ const App: React.FC = () => {
 
                     // Synchronously update local likedIds state without fetching
                     const newIds = new Set(likedIds);
-                    if (!currentlyLiked) newIds.add(track.id);
-                    else newIds.delete(track.id);
+                    if (!currentlyLiked) newIds.add(trackId);
+                    else newIds.delete(trackId);
                     
                     setLikedIds(newIds);
                     (window as any).__sonicpulse_liked_ids = Array.from(newIds);
+                    localStorage.setItem('sonicpulse_liked_ids', JSON.stringify(Array.from(newIds)));
                     
                     showToast(!currentlyLiked ? "已加入紅心歌曲！" : "已取消紅心！");
                     window.dispatchEvent(new CustomEvent('sonicpulse-liked-songs-updated', { detail: { noFetch: true } }));
@@ -2027,7 +2031,7 @@ const App: React.FC = () => {
                 const tr = isRoamingMode ? roamPlaylist[roamTrackIndex]?.track : mainPlaylist[mainTrackIndex]?.track;
                 if (!tr) return false;
                 if (tr.source === 'netease' || tr.source === 'musicfree' || tr.source === 'bilibili') {
-                    return likedIds.has(tr.id);
+                    return likedIds.has(String(tr.id));
                 }
                 return tr.isStarred || false;
             })()}

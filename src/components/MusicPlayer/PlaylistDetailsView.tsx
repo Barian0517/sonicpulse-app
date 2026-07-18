@@ -37,7 +37,9 @@ export const PlaylistDetailsView: React.FC<{
 
     const handleRemoveFromPlaylist = async (track: Track, index: number) => {
         try {
-            await provider.updatePlaylist(playlist.id, undefined, undefined, [index]);
+            const isNavidrome = provider.name === 'Navidrome';
+            const removeTarget = isNavidrome ? index : track.id;
+            await provider.updatePlaylist(playlist.id, undefined, undefined, [removeTarget]);
             // Reload tracks after removal
             loadTracks();
         } catch (e) {
