@@ -4,6 +4,23 @@ use std::fs::{File, OpenOptions};
 use std::io::Write;
 use chrono::Local;
 
+#[cfg(not(debug_assertions))]
+use std::sync::Mutex;
+#[cfg(not(debug_assertions))]
+use tauri_plugin_shell::process::CommandChild;
+
+#[cfg(not(debug_assertions))]
+pub struct SidecarGuard(pub Mutex<Option<CommandChild>>);
+
+#[cfg(not(debug_assertions))]
+impl Drop for SidecarGuard {
+    fn drop(&mut self) {
+        if let Some(child) = self.0.lock().unwrap().take() {
+            let _ = child.kill();
+        }
+    }
+}
+
 #[tauri::command]
 async fn write_log(level: String, message: String) -> Result<(), String> {
     let current_dir = std::env::current_dir().map_err(|e| e.to_string())?;
@@ -96,16 +113,6 @@ pub fn run() {
                 use tauri_plugin_shell::ShellExt;
                 use std::sync::{Arc, Mutex};
                 use tauri::Manager;
-                
-                struct SidecarGuard(Mutex<Option<tauri_plugin_shell::process::CommandChild>>);
-                impl Drop for SidecarGuard {
-                    fn drop(&mut self) {
-                        if let Some(child) = self.0.lock().unwrap().take() {
-                            let _ = child.kill();
-                        }
-                    }
-                }
-                
                 let resource_path = app.handle()
                     .path()
                     .resource_dir()
@@ -147,6 +154,19 @@ pub fn run() {
             get_webview_cookies,
             write_log
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while running tauri application")
+        .run(|app_handle, event| {
+            if let tauri::RunEvent::Exit = event {
+                #[cfg(not(debug_assertions))]
+                {
+                    use tauri::Manager;
+                    if let Some(guard) = app_handle.try_state::<SidecarGuard>() {
+                        if let Some(child) = guard.0.lock().unwrap().take() {
+                            let _ = child.kill();
+                        }
+                    }
+                }
+            }
+        });
 }

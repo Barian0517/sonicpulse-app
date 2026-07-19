@@ -91,6 +91,15 @@ app.use('/api/bilibili', bilibiliRouter);
 const jukeboxRouter = require('./api/jukebox.cjs');
 app.use('/', jukeboxRouter);
 
+// Graceful shutdown endpoint
+app.post('/shutdown', (req, res) => {
+    console.log('Received shutdown request from frontend. Exiting backend process...');
+    res.status(200).send({ success: true });
+    setTimeout(() => {
+        process.exit(0);
+    }, 100);
+});
+
 // Start Netease Server (Runs on 30000)
 require('./api/netease.cjs')();
 
