@@ -516,6 +516,7 @@ export const MusicPlayerLayout: React.FC<{
         } catch (e: any) {
             console.error("Play error:", e);
             window.dispatchEvent(new CustomEvent('sonicpulse-toast', { detail: `無法取得這首歌曲的播放連結: ${e.message}` }));
+            window.dispatchEvent(new CustomEvent('sonicpulse-track-error'));
             return;
         }
 
